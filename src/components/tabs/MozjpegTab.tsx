@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -14,10 +13,10 @@ import type {
   MozJpegColorSpace,
   MozJpegQuantizationTable,
 } from "@/lib/ipc/contracts";
-import { Lightbulb } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSnapshot } from "valtio";
 
+import { EncoderPanel } from "./EncoderPanel";
 import TabCard from "./TabCard";
 
 const QUANTIZATION_TABLES: readonly {
@@ -35,7 +34,11 @@ const QUANTIZATION_TABLES: readonly {
   { value: "watson_taylor_borthwick", label: "Watson Taylor Borthwick" },
 ];
 
-export default function MozjpegTab() {
+export default function MozjpegTab({
+  extensions,
+}: {
+  extensions: readonly string[];
+}) {
   const { t } = useTranslation();
   const snap = useSnapshot(createTaskDraft);
   const config = snap.mozjpeg;
@@ -46,16 +49,10 @@ export default function MozjpegTab() {
   }
 
   return (
-    <div className="w-full h-full min-h-0 flex flex-col gap-1">
-      <div className="w-full h-5 flex items-center mx-2 gap-1">
-        <Lightbulb size={16} className="text-muted-foreground -rotate-12" />
-        <p className="text-muted-foreground text-[0.775rem] -mt-0.5">
-          {t("mozjpegDescription")}
-        </p>
-        <Badge className="text-[0.6rem] py-0 px-1.5">REC.</Badge>
-        <Badge className="text-[0.6rem] py-0 px-1.5">Phase 1</Badge>
-      </div>
-      <div className="w-full min-h-0 flex-1 overflow-y-auto flex gap-2 flex-wrap content-start pr-1">
+    <EncoderPanel
+      description={t("mozjpegDescription")}
+      extensions={extensions}
+    >
         <TabCard
           title={t("quality")}
           value={config.quality}
@@ -176,7 +173,6 @@ export default function MozjpegTab() {
             </SelectContent>
           </Select>
         </TabCard>
-      </div>
-    </div>
+    </EncoderPanel>
   );
 }

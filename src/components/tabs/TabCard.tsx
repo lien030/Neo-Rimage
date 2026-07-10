@@ -9,6 +9,7 @@ export default function TabCard({
   min,
   max,
   placeholder,
+  disabled = false,
   children,
 }: {
   variant?: "number" | "string" | "boolean" | "none";
@@ -18,6 +19,7 @@ export default function TabCard({
   min?: number;
   max?: number;
   placeholder?: string;
+  disabled?: boolean;
   children?: React.ReactNode;
 }) {
   return (
@@ -28,6 +30,7 @@ export default function TabCard({
           <Switch
             size="sm"
             checked={value === true}
+            disabled={disabled}
             onCheckedChange={(checked) => onValueChange?.(checked)}
           />
         )}
@@ -39,6 +42,7 @@ export default function TabCard({
           placeholder={placeholder}
           min={variant === "number" ? min : undefined}
           max={variant === "number" ? max : undefined}
+          disabled={disabled}
           className="h-6 px-1.5 my-1 text-right"
           onChange={(event) => onValueChange?.(event.target.value)}
         />

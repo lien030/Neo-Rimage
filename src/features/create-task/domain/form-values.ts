@@ -39,12 +39,29 @@ export interface MozJpegDraftValue {
   quantizationTable: MozJpegQuantizationTable | null;
 }
 
+export interface JpegDraftValue {
+  quality: string;
+  progressive: boolean;
+}
+
 export interface AvifDraftValue {
   quality: string;
   alphaQuality: string;
   speed: string;
   colorSpace: AvifColorSpace;
   alphaMode: AvifAlphaMode;
+}
+
+export interface OxiPngDraftValue {
+  interlace: boolean;
+  effort: string;
+}
+
+export interface WebPDraftValue {
+  lossless: boolean;
+  quality: string;
+  slightLoss: string;
+  exact: boolean;
 }
 
 export interface OutputDraftValue {
@@ -75,7 +92,10 @@ export interface CreateTaskFormValues {
   inputs: InputDraftValue[];
   activeEncoder: EncoderKind;
   mozjpeg: MozJpegDraftValue;
+  jpeg: JpegDraftValue;
   avif: AvifDraftValue;
+  oxipng: OxiPngDraftValue;
+  webp: WebPDraftValue;
   resize: ResizeDraftValue;
   output: OutputDraftValue;
   metadata: MetadataDraftValue;

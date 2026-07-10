@@ -14,7 +14,9 @@ import {
   markCreateTaskDirty,
   resetCreateTaskDraft,
 } from "@/features/create-task";
+import { useBackendRuntimeState } from "@/features/backend";
 import type {
+  BackendCapabilities,
   CollisionPolicy,
   ResizeFilter,
 } from "@/lib/ipc/contracts";
@@ -37,12 +39,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import MozjpegTab from "@/components/tabs/MozjpegTab";
+import EncoderTabs from "@/components/tabs/EncoderTabs";
 import { AlertCircle, Settings, X } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useSnapshot } from "valtio";
 
@@ -50,7 +52,30 @@ export default function CreateTaskDialog() {
   const app = useAppState();
   const taskStore = useTaskStore();
   const ui = useSnapshot(createTaskUiState);
+  const draft = useSnapshot(createTaskDraft);
+  // Valtio's recursive snapshot type exceeds TypeScript's instantiation depth
+  // for the full capability contract. Keep the cast local to this read-only view.
+  const backend = useBackendRuntimeState() as unknown as {
+    readonly capabilities: BackendCapabilities | null;
+  };
   const { t } = useTranslation();
+  const encoderCapabilities = backend.capabilities?.encoders ?? null;
+  const availableEncoderKinds = useMemo(
+    () =>
+      encoderCapabilities
+        ?.filter((capability) => capability.available)
+        .map((capability) => capability.kind) ?? [],
+    [encoderCapabilities],
+  );
+
+  useEffect(() => {
+    if (
+      availableEncoderKinds.length > 0 &&
+      !availableEncoderKinds.includes(draft.activeEncoder)
+    ) {
+      createTaskDraft.activeEncoder = availableEncoderKinds[0];
+    }
+  }, [availableEncoderKinds, draft.activeEncoder]);
 
   function discardAndClose() {
     if (createTaskUiState.isSubmitting) return;
@@ -74,6 +99,7 @@ export default function CreateTaskDialog() {
       const request = buildCreateJobRequest(
         createTaskDraft,
         taskState.taskCache,
+        availableEncoderKinds,
       );
       createTaskUiState.isSubmitting = true;
 
@@ -143,14 +169,7 @@ export default function CreateTaskDialog() {
               <p className="text-sm font-bold">{t("outputSettings")}</p>
             </span>
             <div className="min-h-0 grid grid-rows-[minmax(0,1fr)_190px] grow gap-3">
-              <Tabs value="mozjpeg" className="w-full min-h-0 overflow-hidden">
-                <TabsList className="w-full h-8 my-1 justify-start">
-                  <TabsTrigger value="mozjpeg">MozJPEG</TabsTrigger>
-                </TabsList>
-                <TabsContent value="mozjpeg" className="min-h-0 h-[calc(100%-40px)]">
-                  <MozjpegTab />
-                </TabsContent>
-              </Tabs>
+              <EncoderTabs capabilities={encoderCapabilities} />
 
               <div className="grid grid-cols-[180px_minmax(0,1fr)] gap-3">
                 <ResizeCard />
@@ -183,7 +202,11 @@ export default function CreateTaskDialog() {
             </Button>
             <Button
               type="button"
-              disabled={ui.isSubmitting}
+              disabled={
+                ui.isSubmitting ||
+                availableEncoderKinds.length === 0 ||
+                !availableEncoderKinds.includes(draft.activeEncoder)
+              }
               onClick={handleCreate}
             >
               {ui.isSubmitting ? t("creatingTask") : t("create")}
@@ -500,6 +523,15 @@ function createTaskErrorMessage(
       chroma_quality_invalid: "createTaskErrorChromaQuality",
       smoothing_invalid: "createTaskErrorSmoothing",
       chroma_subsample_invalid: "createTaskErrorChromaSubsample",
+      jpeg_quality_invalid: "createTaskErrorJpegQuality",
+      avif_quality_invalid: "createTaskErrorAvifQuality",
+      avif_alpha_quality_invalid: "createTaskErrorAvifAlphaQuality",
+      avif_speed_invalid: "createTaskErrorAvifSpeed",
+      oxipng_effort_invalid: "createTaskErrorOxiPngEffort",
+      webp_quality_invalid: "createTaskErrorWebPQuality",
+      webp_slight_loss_invalid: "createTaskErrorWebPSlightLoss",
+      webp_slight_loss_requires_lossless:
+        "createTaskErrorWebPSlightLossRequiresLossless",
       resize_width_invalid: "createTaskErrorResizeWidth",
       resize_height_invalid: "createTaskErrorResizeHeight",
       output_directory_required: "createTaskErrorOutputDirectory",

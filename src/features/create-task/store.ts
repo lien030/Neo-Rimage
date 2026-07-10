@@ -20,12 +20,26 @@ export function createDefaultCreateTaskForm(): CreateTaskFormValues {
       chromaSubsample: "",
       quantizationTable: null,
     },
+    jpeg: {
+      quality: "80",
+      progressive: false,
+    },
     avif: {
       quality: "50",
       alphaQuality: "",
       speed: "6",
       colorSpace: "ycbcr",
       alphaMode: "unassociated_clean",
+    },
+    oxipng: {
+      interlace: false,
+      effort: "2",
+    },
+    webp: {
+      lossless: false,
+      quality: "75",
+      slightLoss: "0",
+      exact: false,
     },
     resize: {
       enabled: false,
