@@ -2,10 +2,11 @@ import { useEffect } from "react";
 import { Button } from "./components/ui/button";
 import TitleBar from "./components/TitleBar";
 import {
+  appState,
+  taskState,
   useAppState,
   useBackendCommandState,
   useBackendRuntimeState,
-  useTaskStore,
 } from "./lib/State";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -38,8 +39,7 @@ import { toast } from "sonner";
 
 function App() {
   const { t } = useTranslation();
-  const appState = useAppState();
-  const taskStore = useTaskStore();
+  const app = useAppState();
   const backend = useBackendRuntimeState();
   const backendCommands = useBackendCommandState();
 
@@ -113,7 +113,7 @@ function App() {
   async function handleDragDrop(paths: string[]) {
     const filepaths = await fileFilter(paths, appState.recursiveFolders);
     const tasklist = await createTaskList(filepaths);
-    taskStore.taskCache = mergeTask(taskStore.taskCache, tasklist);
+    taskState.taskCache = mergeTask(taskState.taskCache, tasklist);
     appState.isShowCreateTask = true;
   }
 
@@ -306,7 +306,7 @@ function App() {
           </div>
         </div>
         <CreateTaskDialog />
-        {appState.isShowDragDrop && <DragDropActive />}
+        {app.isShowDragDrop && <DragDropActive />}
       </main>
       <TitleBar />
     </div>

@@ -83,8 +83,11 @@ function DataTable<TData, TValue>({
   data,
   emptyMessage,
 }: DataTableProps<TData, TValue>) {
+  // TanStack Table treats data identity as a change signal. Keep it stable
+  // across the table's own internal state updates to avoid a render loop.
+  const stableData = useMemo(() => [...data], [data]);
   const table = useReactTable({
-    data: [...data],
+    data: stableData,
     columns,
     getCoreRowModel: getCoreRowModel(),
     defaultColumn: {
@@ -150,7 +153,10 @@ function DataTable<TData, TValue>({
 export default function TaskTable() {
   const { t } = useTranslation();
   const backend = useBackendRuntimeState();
-  const jobs = backend.snapshot ? [...backend.snapshot.jobs] : [];
+  const jobs = useMemo(
+    () => (backend.snapshot ? [...backend.snapshot.jobs] : []),
+    [backend.snapshot],
+  );
 
   const columns = useMemo<ColumnDef<ObservedJobSnapshot>[]>(
     () => [

@@ -1,4 +1,9 @@
-import { useAppState, useTaskStore } from "@/lib/State";
+import {
+  appState,
+  taskState,
+  useAppState,
+  useTaskStore,
+} from "@/lib/State";
 import { backendClient, createJobCommand } from "@/lib/ipc";
 import {
   CreateTaskValidationError,
@@ -42,14 +47,14 @@ import { useTranslation } from "react-i18next";
 import { useSnapshot } from "valtio";
 
 export default function CreateTaskDialog() {
-  const appState = useAppState();
+  const app = useAppState();
   const taskStore = useTaskStore();
   const ui = useSnapshot(createTaskUiState);
   const { t } = useTranslation();
 
   function discardAndClose() {
     if (createTaskUiState.isSubmitting) return;
-    taskStore.taskCache = [];
+    taskState.taskCache = [];
     resetCreateTaskDraft();
     createTaskUiState.isOpen = false;
     appState.isShowCreateTask = false;
@@ -57,7 +62,7 @@ export default function CreateTaskDialog() {
 
   function handleRemoveTaskCache(path: string) {
     if (createTaskUiState.isSubmitting) return;
-    taskStore.taskCache = taskStore.taskCache.filter((task) => task.path !== path);
+    taskState.taskCache = taskState.taskCache.filter((task) => task.path !== path);
     markCreateTaskDirty();
   }
 
@@ -68,7 +73,7 @@ export default function CreateTaskDialog() {
       createTaskUiState.globalError = null;
       const request = buildCreateJobRequest(
         createTaskDraft,
-        taskStore.taskCache,
+        taskState.taskCache,
       );
       createTaskUiState.isSubmitting = true;
 
@@ -76,7 +81,7 @@ export default function CreateTaskDialog() {
         createJobCommand(createCorrelationId(), request),
       );
 
-      taskStore.taskCache = [];
+      taskState.taskCache = [];
       resetCreateTaskDraft();
       createTaskUiState.isOpen = false;
       appState.isShowCreateTask = false;
@@ -89,7 +94,7 @@ export default function CreateTaskDialog() {
 
   return (
     <Dialog
-      open={appState.isShowCreateTask}
+      open={app.isShowCreateTask}
       onOpenChange={(open) => {
         if (open) {
           createTaskUiState.isOpen = true;

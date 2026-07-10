@@ -1,5 +1,4 @@
-import { proxy } from "valtio";
-import { useProxy } from "valtio/utils";
+import { proxy, useSnapshot } from "valtio";
 import { TaskCacheType } from "./type";
 
 export {
@@ -12,9 +11,9 @@ export const appState = proxy({
   isShowCreateTask: false,
   isShowDragDrop: false,
 });
-export const useAppState = () => useProxy(appState);
+export const useAppState = () => useSnapshot(appState);
 
-const taskConfig = proxy<{ taskCache: TaskCacheType[] }>({
+export const taskState = proxy<{ taskCache: TaskCacheType[] }>({
   taskCache: [],
 });
-export const useTaskStore = () => useProxy(taskConfig);
+export const useTaskStore = () => useSnapshot(taskState);
