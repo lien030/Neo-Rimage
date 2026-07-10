@@ -30,4 +30,13 @@ once_cell = "1.21.4"
 serde_repr = "0.1.20"
 sysinfo = "0.39.6"
 walkdir = "2.5.0"
-
+rimage = { path = "vendor/rimage", default-features = false, features = [
+  "resize",
+  "quantization",
+  "mozjpeg",
+  "metadata",
+  "icc",
+] }
+zune-core = { version = "0.5.1", features = ["std"] }
+zune-image = { version = "0.5.0", features = ["simd"] }
+mozjpeg = { version = "0.10.13", default-features = false, features = ["with_simd"] }
