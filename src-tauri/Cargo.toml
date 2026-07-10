@@ -30,9 +30,13 @@ rimage = { path = "vendor/rimage", default-features = false, features = [
   "resize",
   "quantization",
   "mozjpeg",
+  "oxipng",
+  "webp",
   "metadata",
   "icc",
 ] }
 zune-core = { version = "0.5.1", features = ["std"] }
 zune-image = { version = "0.5.0", features = ["simd"] }
 mozjpeg = { version = "0.10.13", default-features = false, features = ["with_simd"] }
+ravif = { version = "0.13.0", default-features = false }
+jpeg-encoder = { version = "0.7.0", features = ["simd"] }

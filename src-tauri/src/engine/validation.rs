@@ -58,41 +58,99 @@ pub(crate) fn validate_request(request: &EngineRequest) -> Result<(), AppError> 
 }
 
 fn validate_encoder(request: &EngineRequest, fields: &mut Vec<FieldError>) {
-    let EncoderConfig::MozJpeg(config) = &request.encoder else {
-        fields.push(field_error(
-            "encoder.kind",
-            "encoder.unsupported",
-            "errors.encoderUnsupported",
-        ));
-        return;
-    };
-
-    validate_range(
-        fields,
-        "encoder.options.quality",
-        config.quality,
-        1.0,
-        100.0,
-    );
-    if let Some(quality) = config.chroma_quality {
-        validate_range(fields, "encoder.options.chromaQuality", quality, 1.0, 100.0);
-    }
-    if config.smoothing > 100 {
-        fields.push(field_error(
-            "encoder.options.smoothing",
-            "validation.out_of_range",
-            "errors.outOfRange",
-        ));
-    }
-    if config
-        .chroma_subsample
-        .is_some_and(|subsample| !(1..=4).contains(&subsample))
-    {
-        fields.push(field_error(
-            "encoder.options.chromaSubsample",
-            "validation.out_of_range",
-            "errors.outOfRange",
-        ));
+    match &request.encoder {
+        EncoderConfig::MozJpeg(config) => {
+            validate_range(
+                fields,
+                "encoder.options.quality",
+                config.quality,
+                1.0,
+                100.0,
+            );
+            if let Some(quality) = config.chroma_quality {
+                validate_range(fields, "encoder.options.chromaQuality", quality, 1.0, 100.0);
+            }
+            if config.smoothing > 100 {
+                fields.push(field_error(
+                    "encoder.options.smoothing",
+                    "validation.out_of_range",
+                    "errors.outOfRange",
+                ));
+            }
+            if config
+                .chroma_subsample
+                .is_some_and(|subsample| !(1..=4).contains(&subsample))
+            {
+                fields.push(field_error(
+                    "encoder.options.chromaSubsample",
+                    "validation.out_of_range",
+                    "errors.outOfRange",
+                ));
+            }
+        }
+        EncoderConfig::Jpeg(config) => validate_range(
+            fields,
+            "encoder.options.quality",
+            config.quality,
+            1.0,
+            100.0,
+        ),
+        EncoderConfig::Avif(config) => {
+            validate_range(
+                fields,
+                "encoder.options.quality",
+                config.quality,
+                1.0,
+                100.0,
+            );
+            if let Some(quality) = config.alpha_quality {
+                validate_range(fields, "encoder.options.alphaQuality", quality, 1.0, 100.0);
+            }
+            if !(1..=10).contains(&config.speed) {
+                fields.push(field_error(
+                    "encoder.options.speed",
+                    "validation.out_of_range",
+                    "errors.outOfRange",
+                ));
+            }
+        }
+        EncoderConfig::OxiPng(config) => {
+            if config.effort > 6 {
+                fields.push(field_error(
+                    "encoder.options.effort",
+                    "validation.out_of_range",
+                    "errors.outOfRange",
+                ));
+            }
+        }
+        EncoderConfig::WebP(config) => {
+            validate_range(
+                fields,
+                "encoder.options.quality",
+                config.quality,
+                1.0,
+                100.0,
+            );
+            if config.slight_loss > 100 {
+                fields.push(field_error(
+                    "encoder.options.slightLoss",
+                    "validation.out_of_range",
+                    "errors.outOfRange",
+                ));
+            }
+            if !config.lossless && config.slight_loss > 0 {
+                fields.push(field_error(
+                    "encoder.options.slightLoss",
+                    "webp.slight_loss_requires_lossless",
+                    "errors.webpSlightLossRequiresLossless",
+                ));
+            }
+        }
+        EncoderConfig::JpegXl
+        | EncoderConfig::Png
+        | EncoderConfig::Farbfeld
+        | EncoderConfig::Ppm
+        | EncoderConfig::Qoi => {}
     }
 
     if !matches!(
@@ -123,7 +181,9 @@ fn validate_output(request: &EngineRequest, fields: &mut Vec<FieldError>) {
         .extension()
         .and_then(|extension| extension.to_str());
     if !extension.is_some_and(|extension| {
-        extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg")
+        super::pipeline::encoder_output_extensions(&request.encoder)
+            .iter()
+            .any(|expected| extension.eq_ignore_ascii_case(expected))
     }) {
         fields.push(field_error(
             "output.outputPath",
@@ -297,8 +357,9 @@ pub(crate) fn same_path(left: &Path, right: &Path) -> bool {
 mod tests {
     use super::*;
     use crate::domain::{
-        EmbeddedMetadataPolicy, JobId, MetadataPolicy, MozJpegConfig, OutputPlan,
-        ProcessingReportPolicy,
+        AvifAlphaMode, AvifColorSpace, AvifConfig, EmbeddedMetadataPolicy, JobId, JpegConfig,
+        MetadataPolicy, MozJpegConfig, OutputPlan, OxiPngConfig, ProcessingReportPolicy,
+        WebPConfig,
     };
     use std::path::PathBuf;
 
@@ -326,19 +387,98 @@ mod tests {
     }
 
     #[test]
-    fn accepts_phase_one_request() {
+    fn accepts_mozjpeg_request() {
         assert!(validate_request(&request()).is_ok());
     }
 
     #[test]
-    fn rejects_an_encoder_without_an_adapter() {
+    fn accepts_every_encoder_with_its_canonical_extension() {
+        let encoders = [
+            (
+                EncoderConfig::Jpeg(JpegConfig {
+                    quality: 80.0,
+                    progressive: true,
+                }),
+                "jpg",
+            ),
+            (
+                EncoderConfig::Avif(AvifConfig {
+                    quality: 50.0,
+                    alpha_quality: None,
+                    speed: 6,
+                    color_space: AvifColorSpace::YCbCr,
+                    alpha_mode: AvifAlphaMode::UnassociatedClean,
+                }),
+                "avif",
+            ),
+            (
+                EncoderConfig::OxiPng(OxiPngConfig {
+                    interlace: false,
+                    effort: 2,
+                }),
+                "png",
+            ),
+            (
+                EncoderConfig::WebP(WebPConfig {
+                    lossless: false,
+                    quality: 75.0,
+                    slight_loss: 0,
+                    exact: false,
+                }),
+                "webp",
+            ),
+            (EncoderConfig::JpegXl, "jxl"),
+            (EncoderConfig::Png, "png"),
+            (EncoderConfig::Farbfeld, "ff"),
+            (EncoderConfig::Ppm, "ppm"),
+            (EncoderConfig::Qoi, "qoi"),
+        ];
+
+        for (encoder, extension) in encoders {
+            let mut request = request();
+            request.encoder = encoder;
+            request.output.output_path = PathBuf::from(format!("D:/output.{extension}"));
+            assert!(validate_request(&request).is_ok(), "extension {extension}");
+        }
+    }
+
+    #[test]
+    fn rejects_extension_mismatch_for_selected_encoder() {
         let mut request = request();
         request.encoder = EncoderConfig::Png;
-        let error = validate_request(&request).expect_err("PNG adapter is not implemented");
+        let error = validate_request(&request).expect_err("PNG output cannot use JPEG extension");
         assert!(error
             .field_errors
             .iter()
-            .any(|field| field.code.0 == "encoder.unsupported"));
+            .any(|field| field.code.0 == "output.extension_mismatch"));
+    }
+
+    #[test]
+    fn validates_codec_specific_ranges_and_relationships() {
+        let mut request = request();
+        request.encoder = EncoderConfig::WebP(WebPConfig {
+            lossless: false,
+            quality: 75.0,
+            slight_loss: 10,
+            exact: false,
+        });
+        request.output.output_path = PathBuf::from("D:/output.webp");
+        let error = validate_request(&request).expect_err("slight loss requires lossless WebP");
+        assert!(error
+            .field_errors
+            .iter()
+            .any(|field| field.code.0 == "webp.slight_loss_requires_lossless"));
+
+        request.encoder = EncoderConfig::OxiPng(OxiPngConfig {
+            interlace: false,
+            effort: 7,
+        });
+        request.output.output_path = PathBuf::from("D:/output.png");
+        let error = validate_request(&request).expect_err("OxiPNG effort must use a preset");
+        assert!(error
+            .field_errors
+            .iter()
+            .any(|field| field.field_path == "encoder.options.effort"));
     }
 
     #[test]

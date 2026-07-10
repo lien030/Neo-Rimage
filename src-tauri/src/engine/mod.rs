@@ -16,4 +16,5 @@ pub use capability::{
     RIMAGE_SOURCE_VERSION,
 };
 pub use local::{Engine, LocalEngine};
+pub(crate) use pipeline::encoder_output_extension;
 pub use runtime::{AtomicCancellationToken, EngineContext, NeverCancelled, NoopProgressReporter};

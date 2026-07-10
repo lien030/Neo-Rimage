@@ -8,14 +8,13 @@ use walkdir::WalkDir;
 
 use crate::{
     domain::{
-        AppError, BackupPolicy, CollisionPolicy, CreateJobRequest, EncoderConfig, ErrorCategory,
-        ErrorContext, InputAcceptancePolicy, InputResource, InputResourceKind, ItemId, ItemSpec,
-        JobId, JobSpec, OutputLocation, OutputPlan, RejectedInput, TimestampMs, IPC_SCHEMA_VERSION,
+        AppError, BackupPolicy, CollisionPolicy, CreateJobRequest, ErrorCategory, ErrorContext,
+        InputAcceptancePolicy, InputResource, InputResourceKind, ItemId, ItemSpec, JobId, JobSpec,
+        OutputLocation, OutputPlan, RejectedInput, TimestampMs, IPC_SCHEMA_VERSION,
     },
+    engine::encoder_output_extension,
     jobs::JobSubmission,
 };
-
-const MOZJPEG_EXTENSION: &str = "jpg";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NormalizationOptions {
@@ -167,14 +166,6 @@ fn validate_request_shape(request: &CreateJobRequest) -> Result<(), AppError> {
             ErrorCategory::Validation,
             "errors.inputRequired",
             "Select at least one input file or directory.",
-        ));
-    }
-    if !matches!(request.encoder, EncoderConfig::MozJpeg(_)) {
-        return Err(AppError::new(
-            "encoder.unsupported",
-            ErrorCategory::Validation,
-            "errors.encoderUnsupported",
-            "The selected encoder is not available in this build.",
         ));
     }
     validate_suffix(&request.output.suffix)?;
@@ -395,6 +386,7 @@ fn plan_items(
             output_root.as_deref(),
             request.output.preserve_structure,
             &request.output.suffix,
+            encoder_output_extension(&request.encoder),
         )?;
         if paths_equal(&candidate.path, &output_path)
             && request.output.collision == CollisionPolicy::Fail
@@ -474,6 +466,7 @@ fn output_path_for(
     output_root: Option<&Path>,
     preserve_structure: bool,
     suffix: &str,
+    extension: &str,
 ) -> Result<PathBuf, AppError> {
     let parent = match output_root {
         None => candidate
@@ -504,7 +497,7 @@ fn output_path_for(
     let mut file_name = stem.to_os_string();
     file_name.push(suffix);
     let mut output = parent.join(file_name);
-    output.set_extension(MOZJPEG_EXTENSION);
+    output.set_extension(extension);
     Ok(output)
 }
 

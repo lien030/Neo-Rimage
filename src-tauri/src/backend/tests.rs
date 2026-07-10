@@ -7,11 +7,12 @@ use std::{
 
 use crate::{
     domain::{
-        AppError, BackupPolicy, CollisionPolicy, ColorProfilePolicy, CorrelationId,
-        CreateJobCommand, EmbeddedMetadataPolicy, EncoderConfig, EngineOutcome, EngineRequest,
-        ErrorCategory, InputAcceptancePolicy, InputResource, InputResourceKind, ItemId, ItemSpec,
-        JobId, JobSpec, MetadataPolicy, MozJpegConfig, OutputLocation, OutputPlan, OutputPolicy,
-        ProcessingReportPolicy, TimestampMs, IPC_SCHEMA_VERSION, JOB_CONFIG_VERSION,
+        AppError, AvifAlphaMode, AvifColorSpace, AvifConfig, BackupPolicy, CollisionPolicy,
+        ColorProfilePolicy, CorrelationId, CreateJobCommand, EmbeddedMetadataPolicy, EncoderConfig,
+        EngineOutcome, EngineRequest, ErrorCategory, InputAcceptancePolicy, InputResource,
+        InputResourceKind, ItemId, ItemSpec, JobId, JobSpec, JpegConfig, MetadataPolicy,
+        MozJpegConfig, OutputLocation, OutputPlan, OutputPolicy, OxiPngConfig,
+        ProcessingReportPolicy, TimestampMs, WebPConfig, IPC_SCHEMA_VERSION, JOB_CONFIG_VERSION,
     },
     engine::{Engine, EngineContext},
     jobs::{
@@ -82,6 +83,77 @@ fn preserves_directory_structure_and_derives_mozjpeg_extension() {
         normalized.submission.items[0].output.output_path,
         output_root.join("nested").join("photo-small.jpg")
     );
+}
+
+#[test]
+fn derives_the_canonical_output_extension_for_every_encoder() {
+    let directory = TestDirectory::new("encoder-extensions");
+    let input = directory.path("photo.png");
+    fs::write(&input, b"fixture").expect("write input");
+    let encoders = [
+        (EncoderConfig::MozJpeg(MozJpegConfig::default()), "jpg"),
+        (
+            EncoderConfig::Jpeg(JpegConfig {
+                quality: 80.0,
+                progressive: false,
+            }),
+            "jpg",
+        ),
+        (
+            EncoderConfig::Avif(AvifConfig {
+                quality: 50.0,
+                alpha_quality: None,
+                speed: 6,
+                color_space: AvifColorSpace::YCbCr,
+                alpha_mode: AvifAlphaMode::UnassociatedClean,
+            }),
+            "avif",
+        ),
+        (
+            EncoderConfig::OxiPng(OxiPngConfig {
+                interlace: false,
+                effort: 2,
+            }),
+            "png",
+        ),
+        (
+            EncoderConfig::WebP(WebPConfig {
+                lossless: false,
+                quality: 75.0,
+                slight_loss: 0,
+                exact: false,
+            }),
+            "webp",
+        ),
+        (EncoderConfig::JpegXl, "jxl"),
+        (EncoderConfig::Png, "png"),
+        (EncoderConfig::Farbfeld, "ff"),
+        (EncoderConfig::Ppm, "ppm"),
+        (EncoderConfig::Qoi, "qoi"),
+    ];
+
+    for (encoder, extension) in encoders {
+        let mut request = request(
+            vec![InputResource {
+                path: input.to_string_lossy().into_owned(),
+                kind: InputResourceKind::File,
+                scan_recursively: false,
+            }],
+            same_directory_output("-encoded"),
+        );
+        request.encoder = encoder;
+        let normalized = RequestNormalizer::default()
+            .normalize(request)
+            .expect("normalize encoder output");
+        assert_eq!(
+            normalized.submission.items[0]
+                .output
+                .output_path
+                .extension()
+                .and_then(|value| value.to_str()),
+            Some(extension)
+        );
+    }
 }
 
 #[test]

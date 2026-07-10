@@ -1,23 +1,33 @@
 use crate::domain::{
-    ColorProfilePolicy, ImageFormat as DomainImageFormat, ImageProperties, MozJpegColorSpace,
-    MozJpegConfig, MozJpegQuantizationTable, ResizeFilter, ResizeMode, ResizeOperation,
+    AvifAlphaMode, AvifColorSpace, AvifConfig, ColorProfilePolicy, EncoderConfig,
+    ImageFormat as DomainImageFormat, ImageProperties, JpegConfig, MozJpegColorSpace,
+    MozJpegConfig, MozJpegQuantizationTable, OxiPngConfig, ResizeFilter, ResizeMode,
+    ResizeOperation, WebPConfig,
 };
+use jpeg_encoder::{ColorType as JpegColorType, Encoder as JpegEncoder};
 use mozjpeg::{qtable, ColorSpace as MozColorSpace};
 use rimage::{
-    codecs::mozjpeg::{MozJpegEncoder, MozJpegOptions},
+    codecs::{
+        mozjpeg::{MozJpegEncoder, MozJpegOptions},
+        oxipng::{OxiPngEncoder, OxiPngOptions},
+        webp::{WebPDecoder, WebPEncoder, WebPOptions},
+    },
     operations::{
         icc::ApplySRGB,
         quantize::Quantize,
         resize::{FilterType, Resize, ResizeAlg},
     },
 };
-use std::{io, path::Path};
+use std::{fs::File, io, io::Write, path::Path};
 use zune_core::{bit_depth::BitDepth, colorspace::ColorSpace};
 use zune_image::{
-    codecs::ImageFormat as ZuneImageFormat,
-    errors::ImageErrors,
+    codecs::{
+        farbfeld::FarbFeldEncoder, jpeg_xl::JxlEncoder, png::PngEncoder, ppm::PPMEncoder,
+        qoi::QoiEncoder, ImageFormat as ZuneImageFormat,
+    },
+    errors::{ImageErrors, ImgEncodeErrors},
     image::Image,
-    traits::{EncoderTrait, OperationsTrait},
+    traits::{DecoderTrait, EncoderTrait, OperationsTrait},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -35,9 +45,14 @@ pub(crate) struct NormalizeOutcome {
 }
 
 pub(crate) fn decode(path: &Path) -> Result<Image, ImageErrors> {
-    // zune-image owns the common decoder dispatch. rimage's custom AVIF/TIFF
-    // adapters are intentionally not enabled in the Phase-1 feature set.
-    Image::open(path)
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase);
+    match extension.as_deref() {
+        Some("webp") => WebPDecoder::try_new(File::open(path)?)?.decode(),
+        _ => Image::open(path),
+    }
 }
 
 pub(crate) fn normalize_color_profile(
@@ -116,11 +131,23 @@ pub(crate) fn apply_quantize(
     Quantize::new(quality.round() as u8, dithering).execute(image)
 }
 
-pub(crate) fn encode_mozjpeg<W: zune_core::bytestream::ZByteWriterTrait>(
+fn encode_mozjpeg<W: Write>(
     image: &Image,
     config: &MozJpegConfig,
     writer: W,
 ) -> Result<usize, ImageErrors> {
+    let mut prepared = image.clone();
+    if prepared.depth() != BitDepth::Eight {
+        prepared.convert_depth(BitDepth::Eight)?;
+    }
+    let input_color_space = match config.color_space {
+        MozJpegColorSpace::Grayscale => ColorSpace::Luma,
+        MozJpegColorSpace::YCbCr | MozJpegColorSpace::Rgb => ColorSpace::RGB,
+    };
+    if prepared.colorspace() != input_color_space {
+        prepared.convert_color(input_color_space)?;
+    }
+
     let (luma_qtable, chroma_qtable) = quantization_tables(config);
     let options = MozJpegOptions {
         quality: config.quality,
@@ -138,7 +165,194 @@ pub(crate) fn encode_mozjpeg<W: zune_core::bytestream::ZByteWriterTrait>(
         chroma_qtable,
     };
 
-    MozJpegEncoder::new_with_options(options).encode(image, writer)
+    MozJpegEncoder::new_with_options(options).encode(&prepared, writer)
+}
+
+pub(crate) fn encode<W: Write>(
+    image: &Image,
+    config: &EncoderConfig,
+    writer: W,
+) -> Result<usize, ImageErrors> {
+    match config {
+        EncoderConfig::MozJpeg(config) => encode_mozjpeg(image, config, writer),
+        EncoderConfig::Jpeg(config) => encode_jpeg(image, config, writer),
+        EncoderConfig::Avif(config) => encode_avif(image, config, writer),
+        EncoderConfig::OxiPng(config) => encode_oxipng(image, config, writer),
+        EncoderConfig::WebP(config) => encode_webp(image, config, writer),
+        EncoderConfig::JpegXl => JxlEncoder::new().encode(image, writer),
+        EncoderConfig::Png => PngEncoder::new().encode(image, writer),
+        EncoderConfig::Farbfeld => FarbFeldEncoder::new().encode(image, writer),
+        EncoderConfig::Ppm => PPMEncoder::new().encode(image, writer),
+        EncoderConfig::Qoi => QoiEncoder::new().encode(image, writer),
+    }
+}
+
+fn encode_jpeg<W: Write>(
+    image: &Image,
+    config: &JpegConfig,
+    writer: W,
+) -> Result<usize, ImageErrors> {
+    // zune-core 0.5.1 accidentally maps its progressive setter to Huffman
+    // optimization. Use zune-image's underlying jpeg-encoder directly so the
+    // strongly typed `progressive` option is effective rather than a no-op.
+    let mut prepared = image.clone();
+    if prepared.depth() != BitDepth::Eight {
+        prepared.convert_depth(BitDepth::Eight)?;
+    }
+    let target_color_space = match prepared.colorspace() {
+        ColorSpace::Luma => ColorSpace::Luma,
+        ColorSpace::RGB => ColorSpace::RGB,
+        ColorSpace::RGBA => ColorSpace::RGBA,
+        _ if prepared.colorspace().has_alpha() => ColorSpace::RGBA,
+        _ => ColorSpace::RGB,
+    };
+    if prepared.colorspace() != target_color_space {
+        prepared.convert_color(target_color_space)?;
+    }
+
+    let (width, height) = prepared.dimensions();
+    let width = u16::try_from(width).map_err(|_| {
+        ImageErrors::EncodeErrors(ImgEncodeErrors::ImageEncodeErrors(
+            "JPEG width exceeds 65535 pixels".to_owned(),
+        ))
+    })?;
+    let height = u16::try_from(height).map_err(|_| {
+        ImageErrors::EncodeErrors(ImgEncodeErrors::ImageEncodeErrors(
+            "JPEG height exceeds 65535 pixels".to_owned(),
+        ))
+    })?;
+    let color_type = match target_color_space {
+        ColorSpace::Luma => JpegColorType::Luma,
+        ColorSpace::RGBA => JpegColorType::Rgba,
+        _ => JpegColorType::Rgb,
+    };
+    let pixels = &prepared.flatten_frames::<u8>()[0];
+    let mut writer = CountingWriter::new(writer);
+    let mut encoder = JpegEncoder::new(&mut writer, config.quality.round() as u8);
+    encoder.set_progressive(config.progressive);
+    encoder
+        .encode(pixels, width, height, color_type)
+        .map_err(|error| {
+            ImageErrors::EncodeErrors(ImgEncodeErrors::ImageEncodeErrors(error.to_string()))
+        })?;
+    Ok(writer.bytes_written)
+}
+
+fn encode_avif<W: Write>(
+    image: &Image,
+    config: &AvifConfig,
+    writer: W,
+) -> Result<usize, ImageErrors> {
+    let prepared = rgb_family_image(image)?;
+    let (width, height) = prepared.dimensions();
+    let pixels = &prepared.flatten_to_u8()[0];
+    let encoder = ravif::Encoder::new()
+        .with_quality(config.quality)
+        .with_alpha_quality(config.alpha_quality.unwrap_or(config.quality))
+        .with_speed(config.speed)
+        .with_internal_color_model(match config.color_space {
+            AvifColorSpace::YCbCr => ravif::ColorModel::YCbCr,
+            AvifColorSpace::Rgb => ravif::ColorModel::RGB,
+        })
+        .with_alpha_color_mode(match config.alpha_mode {
+            AvifAlphaMode::UnassociatedDirty => ravif::AlphaColorMode::UnassociatedDirty,
+            AvifAlphaMode::UnassociatedClean => ravif::AlphaColorMode::UnassociatedClean,
+            AvifAlphaMode::Premultiplied => ravif::AlphaColorMode::Premultiplied,
+        });
+    let encoded = match prepared.colorspace() {
+        ColorSpace::RGBA => {
+            let pixels = pixels
+                .chunks_exact(4)
+                .map(|pixel| ravif::RGBA8::new(pixel[0], pixel[1], pixel[2], pixel[3]))
+                .collect::<Vec<_>>();
+            encoder.encode_rgba(ravif::Img::new(&pixels, width, height))
+        }
+        ColorSpace::RGB => {
+            let pixels = pixels
+                .chunks_exact(3)
+                .map(|pixel| ravif::RGB8::new(pixel[0], pixel[1], pixel[2]))
+                .collect::<Vec<_>>();
+            encoder.encode_rgb(ravif::Img::new(&pixels, width, height))
+        }
+        _ => unreachable!("rgb_family_image always returns RGB or RGBA"),
+    }
+    .map_err(|error| {
+        ImageErrors::EncodeErrors(ImgEncodeErrors::ImageEncodeErrors(error.to_string()))
+    })?;
+    let length = encoded.avif_file.len();
+    let mut writer = writer;
+    writer.write_all(&encoded.avif_file).map_err(|error| {
+        ImageErrors::EncodeErrors(ImgEncodeErrors::ImageEncodeErrors(error.to_string()))
+    })?;
+    Ok(length)
+}
+
+fn encode_oxipng<W: Write>(
+    image: &Image,
+    config: &OxiPngConfig,
+    writer: W,
+) -> Result<usize, ImageErrors> {
+    let mut options = OxiPngOptions::from_preset(config.effort);
+    options.interlace = Some(config.interlace);
+    OxiPngEncoder::new_with_options(options).encode(image, writer)
+}
+
+fn encode_webp<W: Write>(
+    image: &Image,
+    config: &WebPConfig,
+    writer: W,
+) -> Result<usize, ImageErrors> {
+    let prepared = rgb_family_image(image)?;
+    let mut options = WebPOptions::new().map_err(|()| {
+        ImageErrors::EncodeErrors(ImgEncodeErrors::ImageEncodeErrors(
+            "libwebp could not initialize an encoder configuration".to_owned(),
+        ))
+    })?;
+    options.lossless = i32::from(config.lossless);
+    options.quality = config.quality;
+    options.near_lossless = 100 - i32::from(config.slight_loss);
+    options.exact = i32::from(config.exact);
+    WebPEncoder::new_with_options(options).encode(prepared.as_ref(), writer)
+}
+
+fn rgb_family_image(image: &Image) -> Result<std::borrow::Cow<'_, Image>, ImageErrors> {
+    if matches!(image.colorspace(), ColorSpace::RGB | ColorSpace::RGBA) {
+        return Ok(std::borrow::Cow::Borrowed(image));
+    }
+
+    let mut converted = image.clone();
+    converted.convert_color(if image.colorspace().has_alpha() {
+        ColorSpace::RGBA
+    } else {
+        ColorSpace::RGB
+    })?;
+    Ok(std::borrow::Cow::Owned(converted))
+}
+
+struct CountingWriter<W> {
+    inner: W,
+    bytes_written: usize,
+}
+
+impl<W> CountingWriter<W> {
+    fn new(inner: W) -> Self {
+        Self {
+            inner,
+            bytes_written: 0,
+        }
+    }
+}
+
+impl<W: Write> Write for CountingWriter<W> {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        let written = self.inner.write(buffer)?;
+        self.bytes_written = self.bytes_written.saturating_add(written);
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
 }
 
 pub(crate) fn image_properties(image: &Image, path: &Path) -> Result<ImageProperties, io::Error> {
@@ -156,29 +370,133 @@ pub(crate) fn image_properties(image: &Image, path: &Path) -> Result<ImageProper
     })
 }
 
-pub(crate) fn mozjpeg_output_properties(
+pub(crate) fn output_properties(
     image: &Image,
-    config: &MozJpegConfig,
+    config: &EncoderConfig,
 ) -> Result<ImageProperties, io::Error> {
     let (width, height) = image.dimensions();
+    let (color_space, has_alpha) = output_color_space(image, config);
     Ok(ImageProperties {
-        format: DomainImageFormat::Jpeg,
+        format: encoder_format(config),
         width: u32::try_from(width)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "image width exceeds u32"))?,
         height: u32::try_from(height)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "image height exceeds u32"))?,
-        bit_depth: Some(8),
-        color_space: Some(
-            match config.color_space {
-                MozJpegColorSpace::YCbCr => "ycbcr",
-                MozJpegColorSpace::Rgb => "rgb",
-                MozJpegColorSpace::Grayscale => "grayscale",
-            }
-            .to_owned(),
-        ),
-        has_alpha: Some(false),
-        frame_count: Some(1),
+        bit_depth: output_bit_depth(image, config),
+        color_space: color_space.map(str::to_owned),
+        has_alpha,
+        frame_count: Some(if matches!(config, EncoderConfig::WebP(_)) {
+            u32::try_from(image.frames_len()).unwrap_or(u32::MAX)
+        } else {
+            1
+        }),
     })
+}
+
+pub(crate) fn encoder_output_extension(config: &EncoderConfig) -> &'static str {
+    match config {
+        EncoderConfig::MozJpeg(_) | EncoderConfig::Jpeg(_) => "jpg",
+        EncoderConfig::Avif(_) => "avif",
+        EncoderConfig::OxiPng(_) | EncoderConfig::Png => "png",
+        EncoderConfig::WebP(_) => "webp",
+        EncoderConfig::JpegXl => "jxl",
+        EncoderConfig::Farbfeld => "ff",
+        EncoderConfig::Ppm => "ppm",
+        EncoderConfig::Qoi => "qoi",
+    }
+}
+
+pub(crate) fn encoder_output_extensions(config: &EncoderConfig) -> &'static [&'static str] {
+    match config {
+        EncoderConfig::MozJpeg(_) | EncoderConfig::Jpeg(_) => &["jpg", "jpeg"],
+        EncoderConfig::Avif(_) => &["avif"],
+        EncoderConfig::OxiPng(_) | EncoderConfig::Png => &["png"],
+        EncoderConfig::WebP(_) => &["webp"],
+        EncoderConfig::JpegXl => &["jxl"],
+        EncoderConfig::Farbfeld => &["ff", "farbfeld"],
+        EncoderConfig::Ppm => &["ppm", "pnm"],
+        EncoderConfig::Qoi => &["qoi"],
+    }
+}
+
+fn encoder_format(config: &EncoderConfig) -> DomainImageFormat {
+    match config {
+        EncoderConfig::MozJpeg(_) | EncoderConfig::Jpeg(_) => DomainImageFormat::Jpeg,
+        EncoderConfig::Avif(_) => DomainImageFormat::Avif,
+        EncoderConfig::OxiPng(_) | EncoderConfig::Png => DomainImageFormat::Png,
+        EncoderConfig::WebP(_) => DomainImageFormat::WebP,
+        EncoderConfig::JpegXl => DomainImageFormat::JpegXl,
+        EncoderConfig::Farbfeld => DomainImageFormat::Farbfeld,
+        EncoderConfig::Ppm => DomainImageFormat::Ppm,
+        EncoderConfig::Qoi => DomainImageFormat::Qoi,
+    }
+}
+
+fn output_bit_depth(image: &Image, config: &EncoderConfig) -> Option<u8> {
+    match config {
+        EncoderConfig::MozJpeg(_)
+        | EncoderConfig::Jpeg(_)
+        | EncoderConfig::WebP(_)
+        | EncoderConfig::Qoi => Some(8),
+        // ravif's `Auto` mode emits ten-bit AV1 even from the adapter's RGBA8
+        // input. Keep the reported property aligned with the coded stream.
+        EncoderConfig::Avif(_) => Some(10),
+        EncoderConfig::Farbfeld => Some(16),
+        // OxiPNG may reduce bit depth while optimizing, so the exact coded
+        // depth cannot be promised from the pre-encode image alone.
+        EncoderConfig::OxiPng(_) => None,
+        EncoderConfig::JpegXl | EncoderConfig::Png | EncoderConfig::Ppm => match image.depth() {
+            BitDepth::Sixteen | BitDepth::Float32 => Some(16),
+            _ => Some(8),
+        },
+    }
+}
+
+fn output_color_space(
+    image: &Image,
+    config: &EncoderConfig,
+) -> (Option<&'static str>, Option<bool>) {
+    match config {
+        EncoderConfig::MozJpeg(config) => match config.color_space {
+            MozJpegColorSpace::YCbCr => (Some("ycbcr"), Some(false)),
+            MozJpegColorSpace::Rgb => (Some("rgb"), Some(false)),
+            MozJpegColorSpace::Grayscale => (Some("grayscale"), Some(false)),
+        },
+        EncoderConfig::Jpeg(_) => match image.colorspace() {
+            ColorSpace::Luma => (Some("luma"), Some(false)),
+            _ => (Some("rgb"), Some(false)),
+        },
+        EncoderConfig::Avif(config) => (
+            Some(match config.color_space {
+                AvifColorSpace::YCbCr => "ycbcr",
+                AvifColorSpace::Rgb => "rgb",
+            }),
+            Some(image.colorspace().has_alpha()),
+        ),
+        EncoderConfig::WebP(_) | EncoderConfig::Qoi => {
+            if image.colorspace().has_alpha() {
+                (Some("rgba"), Some(true))
+            } else {
+                (Some("rgb"), Some(false))
+            }
+        }
+        EncoderConfig::Farbfeld => (Some("rgba"), Some(true)),
+        // OxiPNG may losslessly reduce RGB to grayscale and/or remove an
+        // unnecessary alpha channel during optimization.
+        EncoderConfig::OxiPng(_) => (None, None),
+        EncoderConfig::JpegXl | EncoderConfig::Png | EncoderConfig::Ppm => {
+            match image.colorspace() {
+                ColorSpace::Luma => (Some("luma"), Some(false)),
+                ColorSpace::LumaA => (Some("luma_alpha"), Some(true)),
+                ColorSpace::RGBA => (Some("rgba"), Some(true)),
+                _ => (Some("rgb"), Some(false)),
+            }
+        }
+    }
+}
+
+pub(crate) fn preserves_icc_profile(config: &EncoderConfig) -> bool {
+    matches!(config, EncoderConfig::MozJpeg(_) | EncoderConfig::OxiPng(_))
 }
 
 pub(crate) fn extension_format(path: &Path) -> DomainImageFormat {

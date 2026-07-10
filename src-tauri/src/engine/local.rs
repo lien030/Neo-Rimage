@@ -5,7 +5,7 @@ use super::{
     validation::{request_context, same_path, validate_request},
 };
 use crate::domain::{
-    AppError, CancellationProbe, CollisionPolicy, EmbeddedMetadataPolicy, EncoderConfig,
+    AppError, CancellationProbe, CollisionPolicy, ColorProfilePolicy, EmbeddedMetadataPolicy,
     EngineOutcome, EngineProgressEvent, EngineRequest, EngineResult, EngineWarning, ErrorCategory,
     ImageFormat, MetadataOutcome, Operation, ProcessingStage, ProgressMeasure, ProgressReporter,
 };
@@ -106,7 +106,7 @@ impl LocalEngine {
                         ErrorCategory::Input,
                         "input.animation_unsupported",
                         "errors.animationUnsupported",
-                        "MozJPEG does not support animated input without discarding frames.",
+                        "Animated input is not supported by this processing pipeline without discarding frames.",
                         false,
                         &request.input_path,
                     ));
@@ -173,7 +173,23 @@ impl LocalEngine {
                     "metadata.exif_not_preserved",
                     Some(ProcessingStage::Normalize),
                     "warnings.exifNotPreserved",
-                    "EXIF preservation is not implemented for the Phase-1 MozJPEG adapter.",
+                    "EXIF preservation is not implemented by the current encoder adapters.",
+                ),
+            );
+        }
+        if normalize.had_color_profile
+            && !normalize.converted_to_srgb
+            && request.metadata.color_profile == ColorProfilePolicy::PreserveWhenSupported
+            && !pipeline::preserves_icc_profile(&request.encoder)
+        {
+            push_warning(
+                context.progress,
+                &mut warnings,
+                warning(
+                    "metadata.icc_not_preserved",
+                    Some(ProcessingStage::Normalize),
+                    "warnings.iccNotPreserved",
+                    "The selected encoder cannot preserve the source ICC profile.",
                 ),
             );
         }
@@ -185,21 +201,8 @@ impl LocalEngine {
             || apply_operations(request, context, &mut image, &mut warnings),
         )?;
 
-        let EncoderConfig::MozJpeg(encoder_config) = &request.encoder else {
-            return Err(engine_error(
-                request,
-                ProcessingStage::Encode,
-                ErrorCategory::Validation,
-                "encoder.unsupported",
-                "errors.encoderUnsupported",
-                "The selected encoder is not available in this build.",
-                false,
-                &request.output.output_path,
-            ));
-        };
-
-        let output_properties = pipeline::mozjpeg_output_properties(&image, encoder_config)
-            .map_err(|_| {
+        let output_properties =
+            pipeline::output_properties(&image, &request.encoder).map_err(|_| {
                 engine_error(
                     request,
                     ProcessingStage::Encode,
@@ -233,9 +236,9 @@ impl LocalEngine {
                             )
                         })?;
 
-                pipeline::encode_mozjpeg(
+                pipeline::encode(
                     &image,
-                    encoder_config,
+                    &request.encoder,
                     transaction.writer().map_err(|_| {
                         engine_error(
                             request,
@@ -254,9 +257,9 @@ impl LocalEngine {
                         request,
                         ProcessingStage::Encode,
                         ErrorCategory::Encoding,
-                        "encoding.mozjpeg_failed",
-                        "errors.mozJpegFailed",
-                        "MozJPEG could not encode the processed image.",
+                        "encoding.encoder_failed",
+                        "errors.encodingFailed",
+                        "The selected encoder could not encode the processed image.",
                         false,
                         &request.output.output_path,
                     )
@@ -364,7 +367,8 @@ impl LocalEngine {
             metadata: MetadataOutcome {
                 embedded_metadata_preserved: false,
                 color_profile_preserved: normalize.had_color_profile
-                    && !normalize.converted_to_srgb,
+                    && !normalize.converted_to_srgb
+                    && pipeline::preserves_icc_profile(&request.encoder),
                 converted_to_srgb: normalize.converted_to_srgb,
                 auto_oriented: false,
             },
@@ -611,8 +615,10 @@ mod tests {
     use super::*;
     use crate::{
         domain::{
-            ColorProfilePolicy, EngineProgressEvent, ItemId, JobId, MetadataPolicy, MozJpegConfig,
-            OutputPlan, ResizeFilter, ResizeMode, ResizeOperation, JOB_CONFIG_VERSION,
+            AvifAlphaMode, AvifColorSpace, AvifConfig, ColorProfilePolicy, EncoderConfig,
+            EngineProgressEvent, ItemId, JobId, JpegConfig, MetadataPolicy, MozJpegConfig,
+            OutputPlan, OxiPngConfig, ResizeFilter, ResizeMode, ResizeOperation, WebPConfig,
+            JOB_CONFIG_VERSION,
         },
         engine::{AtomicCancellationToken, NeverCancelled, NoopProgressReporter},
     };
@@ -740,6 +746,141 @@ mod tests {
                     ..
                 }
             )));
+    }
+
+    #[test]
+    fn every_advertised_encoder_produces_its_real_file_format() {
+        let directory = TestDirectory::new();
+        let encoders = [
+            (
+                "mozjpeg.jpg",
+                EncoderConfig::MozJpeg(MozJpegConfig::default()),
+                ImageFormat::Jpeg,
+            ),
+            (
+                "jpeg.jpg",
+                EncoderConfig::Jpeg(JpegConfig {
+                    quality: 80.0,
+                    progressive: true,
+                }),
+                ImageFormat::Jpeg,
+            ),
+            (
+                "avif.avif",
+                EncoderConfig::Avif(AvifConfig {
+                    quality: 50.0,
+                    alpha_quality: None,
+                    speed: 10,
+                    color_space: AvifColorSpace::YCbCr,
+                    alpha_mode: AvifAlphaMode::UnassociatedClean,
+                }),
+                ImageFormat::Avif,
+            ),
+            (
+                "oxipng.png",
+                EncoderConfig::OxiPng(OxiPngConfig {
+                    interlace: false,
+                    effort: 0,
+                }),
+                ImageFormat::Png,
+            ),
+            (
+                "webp.webp",
+                EncoderConfig::WebP(WebPConfig {
+                    lossless: false,
+                    quality: 75.0,
+                    slight_loss: 0,
+                    exact: false,
+                }),
+                ImageFormat::WebP,
+            ),
+            ("jpeg-xl.jxl", EncoderConfig::JpegXl, ImageFormat::JpegXl),
+            ("png.png", EncoderConfig::Png, ImageFormat::Png),
+            (
+                "farbfeld.ff",
+                EncoderConfig::Farbfeld,
+                ImageFormat::Farbfeld,
+            ),
+            ("ppm.ppm", EncoderConfig::Ppm, ImageFormat::Ppm),
+            ("qoi.qoi", EncoderConfig::Qoi, ImageFormat::Qoi),
+        ];
+
+        for (name, encoder, expected_format) in encoders {
+            let mut request = request(&directory);
+            let expected_dimensions = if name == "farbfeld.ff" {
+                let mut fixture = b"P6\n8 8\n255\n".to_vec();
+                fixture.extend((0..64).flat_map(|index| {
+                    [
+                        (index * 3) as u8,
+                        (255usize.saturating_sub(index * 2)) as u8,
+                        (index * 5) as u8,
+                    ]
+                }));
+                fs::write(&request.input_path, fixture).expect("write Farbfeld fixture");
+                (8, 8)
+            } else {
+                (2, 2)
+            };
+            request.encoder = encoder;
+            request.operations.clear();
+            request.output.output_path = directory.path(name);
+
+            let result = LocalEngine::new()
+                .process(&request, &NoopProgressReporter, &NeverCancelled)
+                .unwrap_or_else(|error| panic!("{name} failed: {error:?}"));
+            assert_eq!(result.output.format, expected_format, "{name}");
+            let bytes = fs::read(&result.output_path).expect("read encoded output");
+            assert_format_signature(name, &bytes);
+            // AVIF input decoding is intentionally unavailable in this build.
+            // zune-farbfeld 0.5.2 rejects even a valid 8x8 output with
+            // `Too small output buffer size`; validate its complete raw layout
+            // below instead of turning that upstream decoder bug into a false
+            // encoder failure.
+            if !matches!(name, "avif.avif" | "farbfeld.ff") {
+                let decoded = pipeline::decode(&result.output_path)
+                    .unwrap_or_else(|error| panic!("{name} could not be decoded again: {error:?}"));
+                assert_eq!(decoded.dimensions(), expected_dimensions, "{name}");
+            }
+        }
+    }
+
+    fn assert_format_signature(name: &str, bytes: &[u8]) {
+        match name {
+            "mozjpeg.jpg" => assert_eq!(&bytes[..2], &[0xff, 0xd8]),
+            "jpeg.jpg" => {
+                assert_eq!(&bytes[..2], &[0xff, 0xd8]);
+                assert!(
+                    bytes.windows(2).any(|marker| marker == [0xff, 0xc2]),
+                    "JPEG progressive option must emit a progressive SOF marker"
+                );
+            }
+            "avif.avif" => {
+                assert_eq!(&bytes[4..8], b"ftyp");
+                assert!(bytes.windows(4).any(|brand| brand == b"avif"));
+            }
+            "oxipng.png" | "png.png" => {
+                assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n")
+            }
+            "webp.webp" => {
+                assert_eq!(&bytes[..4], b"RIFF");
+                assert_eq!(&bytes[8..12], b"WEBP");
+            }
+            "jpeg-xl.jxl" => {
+                assert!(
+                    bytes.starts_with(&[0xff, 0x0a])
+                        || bytes.starts_with(b"\0\0\0\x0cJXL \r\n\x87\n")
+                );
+            }
+            "farbfeld.ff" => {
+                assert!(bytes.starts_with(b"farbfeld"));
+                assert_eq!(u32::from_be_bytes(bytes[8..12].try_into().unwrap()), 8);
+                assert_eq!(u32::from_be_bytes(bytes[12..16].try_into().unwrap()), 8);
+                assert_eq!(bytes.len(), 16 + 8 * 8 * 8);
+            }
+            "ppm.ppm" => assert!(matches!(&bytes[..2], b"P5" | b"P6" | b"P7")),
+            "qoi.qoi" => assert!(bytes.starts_with(b"qoif")),
+            _ => panic!("missing signature assertion for {name}"),
+        }
     }
 
     #[test]

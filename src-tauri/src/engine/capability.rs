@@ -31,35 +31,77 @@ pub fn engine_capabilities() -> EngineCapabilitySet {
 }
 
 fn encoder_capabilities() -> Vec<EncoderCapability> {
-    let unavailable = |kind, extension: &str| EncoderCapability {
-        kind,
-        available: false,
-        output_extensions: vec![extension.to_owned()],
-        options: Vec::new(),
-        limitations: vec!["encoder_adapter_not_implemented".to_owned()],
-    };
-
     vec![
-        EncoderCapability {
-            kind: EncoderKind::MozJpeg,
-            available: true,
-            output_extensions: vec!["jpg".to_owned(), "jpeg".to_owned()],
-            options: mozjpeg_options(),
-            limitations: vec![
-                "animated_input_rejected".to_owned(),
-                "exif_preservation_not_implemented".to_owned(),
-            ],
-        },
-        unavailable(EncoderKind::Jpeg, "jpg"),
-        unavailable(EncoderKind::Avif, "avif"),
-        unavailable(EncoderKind::OxiPng, "png"),
-        unavailable(EncoderKind::WebP, "webp"),
-        unavailable(EncoderKind::JpegXl, "jxl"),
-        unavailable(EncoderKind::Png, "png"),
-        unavailable(EncoderKind::Farbfeld, "ff"),
-        unavailable(EncoderKind::Ppm, "ppm"),
-        unavailable(EncoderKind::Qoi, "qoi"),
+        encoder_capability(
+            EncoderKind::MozJpeg,
+            &["jpg", "jpeg"],
+            mozjpeg_options(),
+            &[],
+        ),
+        encoder_capability(
+            EncoderKind::Jpeg,
+            &["jpg", "jpeg"],
+            jpeg_options(),
+            &["maximum_dimension_65535"],
+        ),
+        encoder_capability(
+            EncoderKind::Avif,
+            &["avif"],
+            avif_options(),
+            &["avif_input_decode_unavailable"],
+        ),
+        encoder_capability(
+            EncoderKind::OxiPng,
+            &["png"],
+            oxipng_options(),
+            &["may_losslessly_reduce_png_properties"],
+        ),
+        encoder_capability(EncoderKind::WebP, &["webp"], webp_options(), &[]),
+        encoder_capability(
+            EncoderKind::JpegXl,
+            &["jxl"],
+            Vec::new(),
+            &["lossless_only"],
+        ),
+        encoder_capability(EncoderKind::Png, &["png"], Vec::new(), &[]),
+        encoder_capability(
+            EncoderKind::Farbfeld,
+            &["ff", "farbfeld"],
+            Vec::new(),
+            &["normalizes_pixels_to_rgba16"],
+        ),
+        encoder_capability(
+            EncoderKind::Ppm,
+            &["ppm", "pnm"],
+            Vec::new(),
+            &["alpha_output_uses_pam_header"],
+        ),
+        encoder_capability(EncoderKind::Qoi, &["qoi"], Vec::new(), &[]),
     ]
+}
+
+fn encoder_capability(
+    kind: EncoderKind,
+    extensions: &[&str],
+    options: Vec<OptionCapability>,
+    codec_limitations: &[&str],
+) -> EncoderCapability {
+    let mut limitations = vec!["exif_preservation_not_implemented".to_owned()];
+    limitations.push("animated_input_rejected".to_owned());
+    if !matches!(kind, EncoderKind::MozJpeg | EncoderKind::OxiPng) {
+        limitations.push("icc_profile_not_preserved".to_owned());
+    }
+    limitations.extend(codec_limitations.iter().map(|value| (*value).to_owned()));
+    EncoderCapability {
+        kind,
+        available: true,
+        output_extensions: extensions
+            .iter()
+            .map(|extension| (*extension).to_owned())
+            .collect(),
+        options,
+        limitations,
+    }
 }
 
 fn mozjpeg_options() -> Vec<OptionCapability> {
@@ -105,6 +147,59 @@ fn mozjpeg_options() -> Vec<OptionCapability> {
                 "watson_taylor_borthwick",
             ],
         ),
+    ]
+}
+
+fn jpeg_options() -> Vec<OptionCapability> {
+    vec![
+        number_option("encoder.options.quality", true, json!(80.0), 1.0, 100.0),
+        boolean_option("encoder.options.progressive", true, false),
+    ]
+}
+
+fn avif_options() -> Vec<OptionCapability> {
+    vec![
+        number_option("encoder.options.quality", true, json!(50.0), 1.0, 100.0),
+        number_option(
+            "encoder.options.alphaQuality",
+            false,
+            Value::Null,
+            1.0,
+            100.0,
+        ),
+        integer_option("encoder.options.speed", true, json!(6), 1.0, 10.0),
+        enum_option(
+            "encoder.options.colorSpace",
+            true,
+            json!("ycbcr"),
+            &["ycbcr", "rgb"],
+        ),
+        enum_option(
+            "encoder.options.alphaMode",
+            true,
+            json!("unassociated_clean"),
+            &["unassociated_dirty", "unassociated_clean", "premultiplied"],
+        ),
+    ]
+}
+
+fn oxipng_options() -> Vec<OptionCapability> {
+    vec![
+        boolean_option("encoder.options.interlace", true, false),
+        integer_option("encoder.options.effort", true, json!(2), 0.0, 6.0),
+    ]
+}
+
+fn webp_options() -> Vec<OptionCapability> {
+    let mut slight_loss = integer_option("encoder.options.slightLoss", true, json!(0), 0.0, 100.0);
+    slight_loss
+        .requires
+        .push("encoder.options.lossless=true".to_owned());
+    vec![
+        boolean_option("encoder.options.lossless", true, false),
+        number_option("encoder.options.quality", true, json!(75.0), 1.0, 100.0),
+        slight_loss,
+        boolean_option("encoder.options.exact", true, false),
     ]
 }
 
@@ -248,7 +343,7 @@ mod tests {
     use crate::domain::MozJpegColorSpace;
 
     #[test]
-    fn only_implemented_encoder_is_advertised() {
+    fn all_implemented_encoders_are_advertised() {
         let capabilities = engine_capabilities();
         let available = capabilities
             .encoders
@@ -256,7 +351,21 @@ mod tests {
             .filter(|encoder| encoder.available)
             .map(|encoder| encoder.kind)
             .collect::<Vec<_>>();
-        assert_eq!(available, vec![EncoderKind::MozJpeg]);
+        assert_eq!(
+            available,
+            vec![
+                EncoderKind::MozJpeg,
+                EncoderKind::Jpeg,
+                EncoderKind::Avif,
+                EncoderKind::OxiPng,
+                EncoderKind::WebP,
+                EncoderKind::JpegXl,
+                EncoderKind::Png,
+                EncoderKind::Farbfeld,
+                EncoderKind::Ppm,
+                EncoderKind::Qoi,
+            ]
+        );
     }
 
     #[test]
