@@ -1,13 +1,28 @@
+import { useAppState, useTaskStore } from "@/lib/State";
+import { backendClient, createJobCommand } from "@/lib/ipc";
+import {
+  CreateTaskValidationError,
+  buildCreateJobRequest,
+  createCorrelationId,
+  createTaskDraft,
+  createTaskUiState,
+  markCreateTaskDirty,
+  resetCreateTaskDraft,
+} from "@/features/create-task";
+import type {
+  CollisionPolicy,
+  ResizeFilter,
+} from "@/lib/ipc/contracts";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/task-dialog";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -18,249 +33,444 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-import { useAppState, useTaskStore } from "./lib/State";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import MozjpegTab from "@/components/tabs/MozjpegTab";
+import { AlertCircle, Settings, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Button } from "./components/ui/button";
-import { Settings, X } from "lucide-react";
-import { Switch } from "./components/ui/switch";
-import {
-  EncoderType,
-  ResizeFilterType,
-  TaskConfig,
-} from "./lib/type";
-import { proxy, useSnapshot } from "valtio";
-import { Input } from "./components/ui/input";
-import { Checkbox } from "./components/ui/checkbox";
-import MozjpegTab from "./components/tabs/MozjpegTab";
+import { useSnapshot } from "valtio";
 
 export default function CreateTaskDialog() {
   const appState = useAppState();
   const taskStore = useTaskStore();
+  const ui = useSnapshot(createTaskUiState);
   const { t } = useTranslation();
 
-  const defConfig: TaskConfig = proxy({
-    filePath: "",
-    fileName: "",
-    encoder: EncoderType.Mozjpeg,
-    resize: false,
-    resizeConfig: {
-      firstly: false,
-      width: 100,
-      height: 100,
-      filter: ResizeFilterType.Lanczos3,
-    },
-    suffix: "",
-    recursive: false,
-    backup: false,
-  });
-
-  function handleRemoveTaskCache(fileName: string) {
-    taskStore.taskCache = taskStore.taskCache.filter(
-      (task) => task.fileName !== fileName
-    );
+  function discardAndClose() {
+    if (createTaskUiState.isSubmitting) return;
+    taskStore.taskCache = [];
+    resetCreateTaskDraft();
+    createTaskUiState.isOpen = false;
+    appState.isShowCreateTask = false;
   }
 
-  function ResizeCard() {
-    const snap = useSnapshot(defConfig);
-    return (
-      <div className="border rounded-lg flex flex-col gap-1">
-        <span className="w-full px-3 py-2 flex justify-between items-center">
-          <p className="text-sm font-bold">{t("resize")}</p>
-          <Switch
-            size="sm"
-            defaultChecked={defConfig.resize}
-            onCheckedChange={(checked) => {
-              defConfig.resize = checked;
-            }}
-          />
-        </span>
-        <span className="flex justify-center items-center text-[0.8rem] gap-2 px-3">
-          <p className="grow text-right">{t("width")}</p>
-          <Input
-            type="number"
-            defaultValue={defConfig.resizeConfig?.width}
-            className="h-7 w-20 px-1 text-right"
-            disabled={!snap.resize}
-            onBlur={(e) => {
-              if (defConfig.resizeConfig) {
-                defConfig.resizeConfig.width = parseInt(e.target.value);
-              }
-            }}
-          />
-          <p className="">px</p>
-        </span>
-        <span className="flex justify-center items-center text-[0.8rem] gap-2 px-3">
-          <p className="grow text-right">{t("height")}</p>
-          <Input
-            defaultValue={defConfig.resizeConfig?.height}
-            type="number"
-            className="h-7 w-20 px-1 text-right"
-            disabled={!snap.resize}
-            onBlur={(e) => {
-              if (defConfig.resizeConfig) {
-                defConfig.resizeConfig.height = parseInt(e.target.value);
-              }
-            }}
-          />
-          <p className="">px</p>
-        </span>
-        <span className="flex justify-center items-center text-[0.8rem] gap-2 px-3">
-          <p className="grow text-right text-nowrap">{t("filter")}</p>
-          <Select
-            defaultValue={ResizeFilterType.Lanczos3.toString()}
-            onValueChange={(v) => {
-              if (defConfig.resizeConfig) {
-                defConfig.resizeConfig.filter = parseInt(v);
-              }
-            }}
-            disabled={!snap.resize}
-          >
-            <SelectTrigger className="h-7 w-[102px] px-2">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ResizeFilterType.Lanczos3.toString()}>
-                Lanczos3
-              </SelectItem>
-              <SelectItem value={ResizeFilterType.Nearest.toString()}>
-                Nearest
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </span>
-        <span className="flex justify-end items-center text-[0.8rem] gap-2 px-3">
-          <Checkbox className="" disabled={!snap.resize} />
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <p className="w-[102px] underline underline-offset-2">
-                  {t("resizeFirstly")}
-                </p>
-              </TooltipTrigger>
-              <TooltipContent>{t("resizeFirstlyDescription")}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </span>
-      </div>
-    );
+  function handleRemoveTaskCache(path: string) {
+    if (createTaskUiState.isSubmitting) return;
+    taskStore.taskCache = taskStore.taskCache.filter((task) => task.path !== path);
+    markCreateTaskDirty();
+  }
+
+  async function handleCreate() {
+    if (createTaskUiState.isSubmitting) return;
+
+    try {
+      createTaskUiState.globalError = null;
+      const request = buildCreateJobRequest(
+        createTaskDraft,
+        taskStore.taskCache,
+      );
+      createTaskUiState.isSubmitting = true;
+
+      await backendClient.createJob(
+        createJobCommand(createCorrelationId(), request),
+      );
+
+      taskStore.taskCache = [];
+      resetCreateTaskDraft();
+      createTaskUiState.isOpen = false;
+      appState.isShowCreateTask = false;
+    } catch (error) {
+      createTaskUiState.globalError = createTaskErrorMessage(error, t);
+    } finally {
+      createTaskUiState.isSubmitting = false;
+    }
   }
 
   return (
     <Dialog
       open={appState.isShowCreateTask}
       onOpenChange={(open) => {
-        appState.isShowCreateTask = open;
-        if (!open) {
-          taskStore.taskCache = [];
+        if (open) {
+          createTaskUiState.isOpen = true;
+          appState.isShowCreateTask = true;
+          return;
         }
+        discardAndClose();
       }}
     >
       <DialogContent
-        className="h-[500px] w-[calc(100%-2rem)] max-w-none overflow-hidden sm:max-w-[calc(100%-2rem)] flex flex-col"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
-        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="h-[540px] w-[calc(100%-2rem)] max-w-none overflow-hidden sm:max-w-[calc(100%-2rem)] flex flex-col"
+        showCloseButton={!ui.isSubmitting}
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => {
+          if (ui.isSubmitting) event.preventDefault();
+        }}
       >
         <DialogHeader>
           <DialogTitle className="select-none">{t("createTask")}</DialogTitle>
         </DialogHeader>
+
         <div className="w-full min-h-0 flex-1 grid grid-cols-[200px_minmax(0,1fr)] gap-4">
           <div className="flex flex-col border rounded-lg overflow-x-hidden overflow-y-auto select-none">
-            {taskStore.taskCache.map((task) => {
-              return (
+            {taskStore.taskCache.length === 0 ? (
+              <p className="m-auto px-4 text-center text-xs text-muted-foreground">
+                {t("createTaskNoInputs")}
+              </p>
+            ) : (
+              taskStore.taskCache.map((task) => (
                 <TaskCard
                   fileName={task.fileName}
+                  path={task.path}
+                  disabled={ui.isSubmitting}
                   onRemove={handleRemoveTaskCache}
                   key={task.path}
                 />
-              );
-            })}
+              ))
+            )}
           </div>
+
           <div className="min-w-0 min-h-0 flex flex-col select-none">
             <span className="flex items-center gap-1">
               <Settings size={18} />
               <p className="text-sm font-bold">{t("outputSettings")}</p>
             </span>
-            <div className="min-h-0 grid grid-rows-[minmax(0,1fr)_170px] grow gap-4">
-              <Tabs
-                defaultValue={defConfig.encoder.toString()}
-                className="w-full min-h-0 overflow-hidden"
-              >
-                <TabsList className="w-full h-8 my-1 justify-start overflow-x-auto overflow-y-hidden">
-                  <TabsTrigger value={EncoderType.Mozjpeg.toString()}>
-                    Mozjpeg
-                  </TabsTrigger>
-                  <TabsTrigger value={EncoderType.Jpeg.toString()}>
-                    JPEG
-                  </TabsTrigger>
-                  <TabsTrigger value={EncoderType.Jpeg_xl.toString()}>
-                    JPEG XL
-                  </TabsTrigger>
-                  <TabsTrigger value={EncoderType.Oxipng.toString()}>
-                    Oxipng
-                  </TabsTrigger>
-                  <TabsTrigger value={EncoderType.Png.toString()}>
-                    PNG
-                  </TabsTrigger>
-                  <TabsTrigger value={EncoderType.Webp.toString()}>
-                    Webp
-                  </TabsTrigger>
-                  <TabsTrigger value={EncoderType.Ppm.toString()}>
-                    PPM
-                  </TabsTrigger>
-                  <TabsTrigger value={EncoderType.Qoi.toString()}>
-                    QOI
-                  </TabsTrigger>
+            <div className="min-h-0 grid grid-rows-[minmax(0,1fr)_190px] grow gap-3">
+              <Tabs value="mozjpeg" className="w-full min-h-0 overflow-hidden">
+                <TabsList className="w-full h-8 my-1 justify-start">
+                  <TabsTrigger value="mozjpeg">MozJPEG</TabsTrigger>
                 </TabsList>
-                <TabsContent value={EncoderType.Mozjpeg.toString()}>
-                  <MozjpegTab config={defConfig} />
-                </TabsContent>
-                <TabsContent value="password">
-                  Change your password here.
+                <TabsContent value="mozjpeg" className="min-h-0 h-[calc(100%-40px)]">
+                  <MozjpegTab />
                 </TabsContent>
               </Tabs>
-              <div className="grid grid-cols-[180px_auto] gap-4">
+
+              <div className="grid grid-cols-[180px_minmax(0,1fr)] gap-3">
                 <ResizeCard />
-                <div className=" border"></div>
+                <OutputCard />
               </div>
             </div>
           </div>
         </div>
+
+        <DialogFooter className="relative min-h-16 items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
+            {ui.globalError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 text-xs text-destructive"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <p>{ui.globalError}</p>
+              </div>
+            )}
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={ui.isSubmitting}
+              onClick={discardAndClose}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={ui.isSubmitting}
+              onClick={handleCreate}
+            >
+              {ui.isSubmitting ? t("creatingTask") : t("create")}
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
+function ResizeCard() {
+  const { t } = useTranslation();
+  const snap = useSnapshot(createTaskDraft);
+  const resize = snap.resize;
+
+  function update(action: () => void) {
+    action();
+    markCreateTaskDirty();
+  }
+
+  return (
+    <div className="border rounded-lg flex flex-col gap-1 px-3 py-2">
+      <span className="flex justify-between items-center">
+        <p className="text-sm font-bold">{t("resize")}</p>
+        <Switch
+          size="sm"
+          checked={resize.enabled}
+          onCheckedChange={(checked) =>
+            update(() => {
+              createTaskDraft.resize.enabled = checked;
+            })
+          }
+        />
+      </span>
+      <CompactNumberField
+        label={t("width")}
+        value={resize.width}
+        disabled={!resize.enabled}
+        onChange={(value) =>
+          update(() => {
+            createTaskDraft.resize.width = value;
+          })
+        }
+      />
+      <CompactNumberField
+        label={t("height")}
+        value={resize.height}
+        disabled={!resize.enabled}
+        onChange={(value) =>
+          update(() => {
+            createTaskDraft.resize.height = value;
+          })
+        }
+      />
+      <Select
+        value={resize.filter}
+        disabled={!resize.enabled}
+        onValueChange={(value) =>
+          update(() => {
+            createTaskDraft.resize.filter = value as ResizeFilter;
+          })
+        }
+      >
+        <SelectTrigger className="h-7 px-2 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="nearest">Nearest</SelectItem>
+          <SelectItem value="bilinear">Bilinear</SelectItem>
+          <SelectItem value="hamming">Hamming</SelectItem>
+          <SelectItem value="catmull_rom">Catmull-Rom</SelectItem>
+          <SelectItem value="mitchell">Mitchell</SelectItem>
+          <SelectItem value="lanczos3">Lanczos3</SelectItem>
+        </SelectContent>
+      </Select>
+      <CompactSwitch
+        label={t("allowUpscale")}
+        checked={resize.allowUpscale}
+        disabled={!resize.enabled}
+        onCheckedChange={(checked) =>
+          update(() => {
+            createTaskDraft.resize.allowUpscale = checked;
+          })
+        }
+      />
+      <CompactSwitch
+        label={t("allowDownscale")}
+        checked={resize.allowDownscale}
+        disabled={!resize.enabled}
+        onCheckedChange={(checked) =>
+          update(() => {
+            createTaskDraft.resize.allowDownscale = checked;
+          })
+        }
+      />
+    </div>
+  );
+}
+
+function OutputCard() {
+  const { t } = useTranslation();
+  const snap = useSnapshot(createTaskDraft);
+  const output = snap.output;
+  const isDirectory = output.locationMode === "directory";
+  const canBackup = output.collision === "replace";
+
+  function update(action: () => void) {
+    action();
+    markCreateTaskDirty();
+  }
+
+  return (
+    <div className="border rounded-lg px-3 py-2 min-w-0 grid grid-cols-2 content-start gap-x-3 gap-y-1.5">
+      <p className="col-span-2 text-sm font-bold">{t("output")}</p>
+      <Select
+        value={output.locationMode}
+        onValueChange={(value) =>
+          update(() => {
+            createTaskDraft.output.locationMode = value as
+              | "same_directory"
+              | "directory";
+          })
+        }
+      >
+        <SelectTrigger className="h-7 px-2 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="same_directory">{t("sameDirectory")}</SelectItem>
+          <SelectItem value="directory">{t("customDirectory")}</SelectItem>
+        </SelectContent>
+      </Select>
+      <Input
+        value={output.outputDirectory}
+        disabled={!isDirectory}
+        placeholder={t("outputDirectory")}
+        className="h-7 px-2 text-xs"
+        onChange={(event) =>
+          update(() => {
+            createTaskDraft.output.outputDirectory = event.target.value;
+          })
+        }
+      />
+      <Input
+        value={output.suffix}
+        placeholder={t("suffix")}
+        className="h-7 px-2 text-xs"
+        onChange={(event) =>
+          update(() => {
+            createTaskDraft.output.suffix = event.target.value;
+          })
+        }
+      />
+      <Select
+        value={output.collision}
+        onValueChange={(value) =>
+          update(() => {
+            const collision = value as CollisionPolicy;
+            createTaskDraft.output.collision = collision;
+            if (collision !== "replace") {
+              createTaskDraft.output.sourceBackup = false;
+              createTaskDraft.output.existingOutputBackup = false;
+            }
+          })
+        }
+      >
+        <SelectTrigger className="h-7 px-2 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="fail">{t("collisionFail")}</SelectItem>
+          <SelectItem value="replace">{t("collisionReplace")}</SelectItem>
+          <SelectItem value="auto_rename">{t("collisionAutoRename")}</SelectItem>
+        </SelectContent>
+      </Select>
+      <CompactSwitch
+        label={t("preserveStructure")}
+        checked={output.preserveStructure}
+        disabled={!isDirectory}
+        onCheckedChange={(checked) =>
+          update(() => {
+            createTaskDraft.output.preserveStructure = checked;
+          })
+        }
+      />
+      <CompactSwitch
+        label={t("sourceBackup")}
+        checked={output.sourceBackup}
+        disabled={!canBackup}
+        onCheckedChange={(checked) =>
+          update(() => {
+            createTaskDraft.output.sourceBackup = checked;
+          })
+        }
+      />
+      <CompactSwitch
+        label={t("existingOutputBackup")}
+        checked={output.existingOutputBackup}
+        disabled={!canBackup}
+        onCheckedChange={(checked) =>
+          update(() => {
+            createTaskDraft.output.existingOutputBackup = checked;
+          })
+        }
+      />
+    </div>
+  );
+}
+
+function CompactNumberField({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-xs">
+      <span className="grow text-right">{label}</span>
+      <Input
+        type="number"
+        min={1}
+        value={value}
+        disabled={disabled}
+        className="h-7 w-20 px-1 text-right"
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <span>px</span>
+    </label>
+  );
+}
+
+function CompactSwitch({
+  label,
+  checked,
+  disabled = false,
+  onCheckedChange,
+}: {
+  label: string;
+  checked: boolean;
+  disabled?: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex min-w-0 items-center justify-between gap-2 text-[0.7rem]">
+      <span className="truncate">{label}</span>
+      <Switch
+        size="sm"
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange}
+      />
+    </label>
+  );
+}
+
 function TaskCard({
   fileName,
+  path,
+  disabled,
   onRemove,
 }: {
   fileName: string;
-  onRemove: (fileName: string) => void;
+  path: string;
+  disabled: boolean;
+  onRemove: (path: string) => void;
 }) {
   return (
-    <div className="w-full h-6 px-2 py-1 grid grid-cols-[auto_20px] gap-1 hover:bg-slate-100">
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <p className="w-full whitespace-nowrap overflow-hidden text-ellipsis text-sm">
-              {fileName}
-            </p>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{fileName}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+    <div className="w-full h-7 px-2 py-1 grid grid-cols-[minmax(0,1fr)_20px] gap-1 hover:bg-slate-100">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <p className="w-full whitespace-nowrap overflow-hidden text-ellipsis text-sm">
+            {fileName}
+          </p>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{path}</p>
+        </TooltipContent>
+      </Tooltip>
 
       <figure className="flex justify-center items-center">
         <Button
-          variant={"ghost"}
+          type="button"
+          variant="ghost"
+          disabled={disabled}
           className="p-0 m-0 h-full"
-          onClick={() => {
-            onRemove(fileName);
-          }}
+          onClick={() => onRemove(path)}
         >
           <X
             size={16}
@@ -270,4 +480,42 @@ function TaskCard({
       </figure>
     </div>
   );
+}
+
+function createTaskErrorMessage(
+  error: unknown,
+  t: (key: string) => string,
+): string {
+  if (error instanceof CreateTaskValidationError) {
+    const keyByCode: Record<CreateTaskValidationError["code"], string> = {
+      inputs_required: "createTaskErrorInputsRequired",
+      input_path_required: "createTaskErrorInputPath",
+      encoder_unsupported: "createTaskErrorEncoderUnsupported",
+      quality_invalid: "createTaskErrorQuality",
+      chroma_quality_invalid: "createTaskErrorChromaQuality",
+      smoothing_invalid: "createTaskErrorSmoothing",
+      chroma_subsample_invalid: "createTaskErrorChromaSubsample",
+      resize_width_invalid: "createTaskErrorResizeWidth",
+      resize_height_invalid: "createTaskErrorResizeHeight",
+      output_directory_required: "createTaskErrorOutputDirectory",
+      suffix_invalid: "createTaskErrorSuffix",
+      backup_requires_replace: "createTaskErrorBackupPolicy",
+    };
+    return t(keyByCode[error.code]);
+  }
+
+  if (isRecord(error)) {
+    const appError = isRecord(error.error) ? error.error : error;
+    if (typeof appError.fallbackMessage === "string") {
+      return appError.fallbackMessage;
+    }
+    if (typeof appError.message === "string") return appError.message;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string") return error;
+  return t("createTaskErrorUnknown");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

@@ -446,6 +446,7 @@ export interface CommandAccepted<T> {
 }
 
 export type StateEvent =
+  | { kind: "snapshot_invalidated" }
   | { kind: "scheduler_changed"; payload: SchedulerSnapshot }
   | { kind: "worker_slots_changed"; payload: WorkerSlotSnapshot[] }
   | { kind: "job_changed"; payload: JobSnapshot }

@@ -1,9 +1,12 @@
 import { useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { Button } from "./components/ui/button";
 import TitleBar from "./components/TitleBar";
-import { generate as generateShortUUID } from "short-uuid";
-import { useAppState, useTaskStore, useWorkerList } from "./lib/State";
+import {
+  useAppState,
+  useBackendCommandState,
+  useBackendRuntimeState,
+  useTaskStore,
+} from "./lib/State";
 import { listen } from "@tauri-apps/api/event";
 import {
   CookingPot,
@@ -24,13 +27,30 @@ import { useTranslation } from "react-i18next";
 import TaskTable from "./components/TaskTable";
 import { createTaskList, fileFilter, mergeTask } from "./lib/appUtils";
 import WorkerList from "./components/WorkerList";
-import { WorkerStatusType } from "./lib/type";
 import CreateTaskDialog from "./CreateTaskDialog";
+import {
+  formatBackendError,
+  setSchedulerPaused,
+  setWorkerCount,
+  useBackendRuntimeSync,
+} from "@/features/backend";
+import { toast } from "sonner";
+
 function App() {
   const { t } = useTranslation();
   const appState = useAppState();
   const taskStore = useTaskStore();
-  const workerList = useWorkerList();
+  const backend = useBackendRuntimeState();
+  const backendCommands = useBackendCommandState();
+
+  useBackendRuntimeSync();
+
+  const scheduler = backend.snapshot?.scheduler;
+  const schedulerRunning = scheduler?.mode === "running";
+  const backendReady = backend.syncStatus === "ready" && scheduler !== undefined;
+  const minimumConcurrency = backend.capabilities?.concurrency.minimum ?? 1;
+  const maximumConcurrency =
+    backend.capabilities?.concurrency.maximum ?? scheduler?.maxConcurrency ?? 1;
 
   useEffect(() => {
     const dragDrop = listen(
@@ -98,32 +118,61 @@ function App() {
   }
 
   async function handleAddWorker() {
-    const workerId = generateShortUUID();
-    const response = await invoke<boolean>("add_worker", { workerId });
-    if (response) {
-      workerList.push({
-        id: workerId,
-        status: WorkerStatusType.Idle,
-        task: null,
+    if (!scheduler || backendCommands.workerCountPending) {
+      return;
+    }
+
+    const desired = Math.min(
+      scheduler.desiredConcurrency + 1,
+      maximumConcurrency,
+    );
+    if (desired === scheduler.desiredConcurrency) {
+      return;
+    }
+
+    try {
+      await setWorkerCount(desired);
+    } catch (error: unknown) {
+      toast.error("Unable to increase concurrency", {
+        description: formatBackendError(error),
       });
     }
   }
 
   async function handleRemoveWorker() {
-    if (workerList.length === 0) return;
-    const workerId = workerList.pop()?.id;
-    if (workerId) {
-      await invoke("remove_worker", { workerId: workerId });
+    if (!scheduler || backendCommands.workerCountPending) {
+      return;
+    }
+
+    const desired = Math.max(
+      scheduler.desiredConcurrency - 1,
+      minimumConcurrency,
+    );
+    if (desired === scheduler.desiredConcurrency) {
+      return;
+    }
+
+    try {
+      await setWorkerCount(desired);
+    } catch (error: unknown) {
+      toast.error("Unable to decrease concurrency", {
+        description: formatBackendError(error),
+      });
     }
   }
 
-  function handleClearAll() {
-    taskStore.taskCache = [];
-    taskStore.taskList = [];
-  }
+  async function handleBreaker() {
+    if (!scheduler || backendCommands.schedulerPending) {
+      return;
+    }
 
-  function handleBreaker() {
-    appState.running = !appState.running;
+    try {
+      await setSchedulerPaused(scheduler.mode === "running");
+    } catch (error: unknown) {
+      toast.error("Unable to update the scheduler", {
+        description: formatBackendError(error),
+      });
+    }
   }
 
   return (
@@ -155,7 +204,7 @@ function App() {
                   <DropdownMenuTrigger asChild>
                     <Button
                       size={"icon"}
-                      disabled={appState.running}
+                      disabled={!backendReady}
                       className="text-muted-foreground bg-background hover:bg-muted-foreground/10 border h-7 w-12 rounded-lg"
                     >
                       <CookingPot size={16} />
@@ -178,7 +227,7 @@ function App() {
                       </figure>
                       <p className="mx-2">Error</p>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleClearAll}>
+                    <DropdownMenuItem disabled>
                       <p className="mx-4">ClearAll</p>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -194,12 +243,24 @@ function App() {
                 <p className="text-primary font-bold tracking-wide">
                   {t("workers")}
                 </p>
+                {scheduler && (
+                  <p className="text-xs text-muted-foreground self-center">
+                    {scheduler.effectiveConcurrency}/
+                    {scheduler.desiredConcurrency}
+                  </p>
+                )}
               </span>
               <span className="flex gap-2 mx-2">
                 <Button
                   size={"icon"}
                   className="text-muted-foreground border h-7 w-12 rounded-lg"
                   onClick={handleAddWorker}
+                  disabled={
+                    !backendReady ||
+                    backendCommands.workerCountPending ||
+                    (scheduler?.desiredConcurrency ?? maximumConcurrency) >=
+                      maximumConcurrency
+                  }
                 >
                   <Plus size={16} className="text-white" />
                 </Button>
@@ -207,6 +268,12 @@ function App() {
                   size={"icon"}
                   onClick={handleRemoveWorker}
                   className="text-muted-foreground bg-background hover:bg-muted-foreground/10 border h-7 w-10 rounded-lg"
+                  disabled={
+                    !backendReady ||
+                    backendCommands.workerCountPending ||
+                    (scheduler?.desiredConcurrency ?? minimumConcurrency) <=
+                      minimumConcurrency
+                  }
                 >
                   <Minus size={16} />
                 </Button>
@@ -215,16 +282,24 @@ function App() {
             <WorkerList />
             <Button
               className={`mt-4 transition-all ${
-                appState.running
+                schedulerRunning
                   ? "bg-red-50 hover:bg-red-100 border border-red-600"
                   : ""
               }`}
               onClick={handleBreaker}
+              disabled={
+                !backendReady ||
+                backendCommands.schedulerPending ||
+                scheduler?.mode === "shutting_down"
+              }
             >
-              {!appState.running && (
+              {!backendReady && (
+                <p className="mx-2 font-bold text-lg">SYNC</p>
+              )}
+              {backendReady && !schedulerRunning && (
                 <p className="mx-2 font-bold text-lg">GO</p>
               )}
-              {appState.running && (
+              {backendReady && schedulerRunning && (
                 <p className="mx-2 font-bold text-lg text-red-600">STOP</p>
               )}
             </Button>

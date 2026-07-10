@@ -9,7 +9,6 @@ import { LanguageType } from "@/lib/type";
 import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { exit } from "@tauri-apps/plugin-process";
 import i18n from "@/i18n/config";
 
 export default function TitleBar() {
@@ -20,7 +19,7 @@ export default function TitleBar() {
   }, [isPinned]);
 
   async function handleWindowClosed() {
-    await exit(0);
+    await getCurrentWindow().close();
   }
 
   async function handleWindowMinimize() {

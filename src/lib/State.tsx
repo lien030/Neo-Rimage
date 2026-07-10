@@ -1,21 +1,20 @@
 import { proxy } from "valtio";
 import { useProxy } from "valtio/utils";
-import { ProcessWorker, AppState, TaskStore } from "./type";
+import { TaskCacheType } from "./type";
 
-export const appState: AppState = proxy({
+export {
+  useBackendCommandState,
+  useBackendRuntimeState,
+} from "@/features/backend";
+
+export const appState = proxy({
   recursiveFolders: true,
   isShowCreateTask: false,
   isShowDragDrop: false,
-  running: false,
 });
 export const useAppState = () => useProxy(appState);
 
-export const defaultWorkerData: ProcessWorker[] = [];
-const workerConfig = proxy(defaultWorkerData);
-export const useWorkerList = () => useProxy(workerConfig);
-
-const taskConfig:TaskStore = proxy({
-  taskList: [],
+const taskConfig = proxy<{ taskCache: TaskCacheType[] }>({
   taskCache: [],
 });
 export const useTaskStore = () => useProxy(taskConfig);

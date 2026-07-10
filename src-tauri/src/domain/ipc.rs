@@ -122,6 +122,7 @@ impl StateEventEnvelope {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", content = "payload", rename_all = "snake_case")]
 pub enum StateEvent {
+    SnapshotInvalidated,
     SchedulerChanged(SchedulerSnapshot),
     WorkerSlotsChanged(Vec<WorkerSlotSnapshot>),
     JobChanged(JobSnapshot),

@@ -4,18 +4,20 @@ import { Switch } from "../ui/switch";
 export default function TabCard({
   variant = "number",
   title,
-  defaultValue,
+  value,
   onValueChange,
   min,
   max,
+  placeholder,
   children,
 }: {
   variant?: "number" | "string" | "boolean" | "none";
   title: string;
-  defaultValue?: any;
-  onValueChange?: (value: any) => void;
+  value?: string | boolean;
+  onValueChange?: (value: string | boolean) => void;
   min?: number;
   max?: number;
+  placeholder?: string;
   children?: React.ReactNode;
 }) {
   return (
@@ -25,21 +27,20 @@ export default function TabCard({
         {variant === "boolean" && (
           <Switch
             size="sm"
-            defaultChecked={defaultValue}
-            onCheckedChange={onValueChange}
+            checked={value === true}
+            onCheckedChange={(checked) => onValueChange?.(checked)}
           />
         )}
       </span>
       {variant === "number" && (
         <Input
           type={variant === "number" ? "number" : "text"}
-          defaultValue={defaultValue}
+          value={typeof value === "string" ? value : ""}
+          placeholder={placeholder}
           min={variant === "number" ? min : undefined}
           max={variant === "number" ? max : undefined}
           className="h-6 px-1.5 my-1 text-right"
-          onBlur={(e) => {
-            onValueChange && onValueChange(e.target.value);
-          }}
+          onChange={(event) => onValueChange?.(event.target.value)}
         />
       )}
       {children}

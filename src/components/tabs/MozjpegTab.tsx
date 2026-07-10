@@ -1,9 +1,4 @@
-import { MozjpegColorSpaceType, TaskConfig } from "@/lib/type";
-import { useEffect } from "react";
-import TabCard from "./TabCard";
-import { useTranslation } from "react-i18next";
-import { Lightbulb } from "lucide-react";
-import { Badge } from "../ui/badge";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -11,62 +6,173 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  createTaskDraft,
+  markCreateTaskDirty,
+} from "@/features/create-task";
+import type {
+  MozJpegColorSpace,
+  MozJpegQuantizationTable,
+} from "@/lib/ipc/contracts";
+import { Lightbulb } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { useSnapshot } from "valtio";
 
-export default function MozjpegTab({ config }: { config: TaskConfig }) {
+import TabCard from "./TabCard";
+
+const QUANTIZATION_TABLES: readonly {
+  value: MozJpegQuantizationTable;
+  label: string;
+}[] = [
+  { value: "ahumada_watson_peterson", label: "Ahumada Watson Peterson" },
+  { value: "annex_k", label: "Annex K" },
+  { value: "flat", label: "Flat" },
+  { value: "klein_silverstein_carney", label: "Klein Silverstein Carney" },
+  { value: "msssim", label: "MSSSIM" },
+  { value: "n_robidoux", label: "N. Robidoux" },
+  { value: "psnr_hvs", label: "PSNR-HVS" },
+  { value: "peterson_ahumada_watson", label: "Peterson Ahumada Watson" },
+  { value: "watson_taylor_borthwick", label: "Watson Taylor Borthwick" },
+];
+
+export default function MozjpegTab() {
   const { t } = useTranslation();
-  useEffect(() => {
-    if (!config.encodeConfig) {
-      config.encodeConfig = {
-        mozjpeg: {
-          quality: 75,
-          progressive: true,
-          optimizeCoding: true,
-          smoothing: 0,
-          colorSpace: MozjpegColorSpaceType.JCS_YCbCr,
-          trellisMultipass: false,
-        },
-      };
-    }
-  }, []);
+  const snap = useSnapshot(createTaskDraft);
+  const config = snap.mozjpeg;
+
+  function update(action: () => void) {
+    action();
+    markCreateTaskDirty();
+  }
+
   return (
-    <div className="w-full flex flex-col gap-1">
+    <div className="w-full h-full min-h-0 flex flex-col gap-1">
       <div className="w-full h-5 flex items-center mx-2 gap-1">
         <Lightbulb size={16} className="text-muted-foreground -rotate-12" />
         <p className="text-muted-foreground text-[0.775rem] -mt-0.5">
           {t("mozjpegDescription")}
         </p>
         <Badge className="text-[0.6rem] py-0 px-1.5">REC.</Badge>
-        <Badge className="text-[0.6rem] py-0 px-1.5">Small</Badge>
+        <Badge className="text-[0.6rem] py-0 px-1.5">Phase 1</Badge>
       </div>
-      <div className="w-full flex gap-2 flex-wrap">
+      <div className="w-full min-h-0 flex-1 overflow-y-auto flex gap-2 flex-wrap content-start pr-1">
         <TabCard
           title={t("quality")}
-          defaultValue={config.encodeConfig?.mozjpeg?.quality}
+          value={config.quality}
           min={1}
           max={100}
+          onValueChange={(value) =>
+            update(() => {
+              createTaskDraft.mozjpeg.quality = String(value);
+            })
+          }
+        />
+        <TabCard
+          title={t("chromaQuality")}
+          value={config.chromaQuality}
+          placeholder={t("automatic")}
+          min={1}
+          max={100}
+          onValueChange={(value) =>
+            update(() => {
+              createTaskDraft.mozjpeg.chromaQuality = String(value);
+            })
+          }
         />
         <TabCard
           title={t("smoothing")}
-          defaultValue={config.encodeConfig?.mozjpeg?.smoothing}
+          value={config.smoothing}
+          min={0}
+          max={100}
+          onValueChange={(value) =>
+            update(() => {
+              createTaskDraft.mozjpeg.smoothing = String(value);
+            })
+          }
         />
-        <TabCard title={t("progressive")} variant="boolean" />
-        <TabCard title={t("optimizeCoding")} variant="boolean" />
+        <TabCard
+          title={t("progressive")}
+          variant="boolean"
+          value={config.progressive}
+          onValueChange={(value) =>
+            update(() => {
+              createTaskDraft.mozjpeg.progressive = Boolean(value);
+            })
+          }
+        />
+        <TabCard
+          title={t("optimizeCoding")}
+          variant="boolean"
+          value={config.optimizeCoding}
+          onValueChange={(value) =>
+            update(() => {
+              createTaskDraft.mozjpeg.optimizeCoding = Boolean(value);
+            })
+          }
+        />
+        <TabCard
+          title={t("trellisMultipass")}
+          variant="boolean"
+          value={config.trellisMultipass}
+          onValueChange={(value) =>
+            update(() => {
+              createTaskDraft.mozjpeg.trellisMultipass = Boolean(value);
+            })
+          }
+        />
         <TabCard title={t("colorSpace")} variant="none">
           <Select
-            defaultValue={config.encodeConfig?.mozjpeg?.colorSpace.toString()}
-            onValueChange={(v) => {
-              if (config.encodeConfig && config.encodeConfig.mozjpeg) {
-                config.encodeConfig.mozjpeg.colorSpace = parseInt(v);
-              }
-            }}
+            value={config.colorSpace}
+            onValueChange={(value: MozJpegColorSpace) =>
+              update(() => {
+                createTaskDraft.mozjpeg.colorSpace = value;
+              })
+            }
           >
             <SelectTrigger className="h-6 px-1.5 my-1 text-[0.775rem]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={MozjpegColorSpaceType.JCS_YCbCr.toString()}>
-                JCS YCbCr
-              </SelectItem>
+              <SelectItem value="ycbcr">YCbCr</SelectItem>
+              <SelectItem value="rgb">RGB</SelectItem>
+              <SelectItem value="grayscale">Grayscale</SelectItem>
+            </SelectContent>
+          </Select>
+        </TabCard>
+        <TabCard
+          title={t("chromaSubsample")}
+          value={config.chromaSubsample}
+          placeholder={t("automatic")}
+          min={1}
+          max={4}
+          onValueChange={(value) =>
+            update(() => {
+              createTaskDraft.mozjpeg.chromaSubsample = String(value);
+            })
+          }
+        />
+        <TabCard title={t("quantizationTable")} variant="none">
+          <Select
+            value={config.quantizationTable ?? "default"}
+            onValueChange={(value) =>
+              update(() => {
+                createTaskDraft.mozjpeg.quantizationTable =
+                  value === "default"
+                    ? null
+                    : (value as MozJpegQuantizationTable);
+              })
+            }
+          >
+            <SelectTrigger className="h-6 px-1.5 my-1 text-[0.7rem]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">{t("encoderDefault")}</SelectItem>
+              {QUANTIZATION_TABLES.map((table) => (
+                <SelectItem key={table.value} value={table.value}>
+                  {table.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </TabCard>
@@ -74,4 +180,3 @@ export default function MozjpegTab({ config }: { config: TaskConfig }) {
     </div>
   );
 }
-
