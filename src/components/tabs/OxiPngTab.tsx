@@ -10,8 +10,10 @@ import TabCard from "./TabCard";
 
 export default function OxiPngTab({
   extensions,
+  limitations = [],
 }: {
   extensions: readonly string[];
+  limitations?: readonly string[];
 }) {
   const { t } = useTranslation();
   const config = useSnapshot(createTaskDraft).oxipng;
@@ -22,7 +24,11 @@ export default function OxiPngTab({
   }
 
   return (
-    <EncoderPanel description={t("oxipngDescription")} extensions={extensions}>
+    <EncoderPanel
+      description={t("oxipngDescription")}
+      extensions={extensions}
+      limitations={limitations}
+    >
       <TabCard
         title={t("interlace")}
         variant="boolean"

@@ -10,8 +10,10 @@ import TabCard from "./TabCard";
 
 export default function JpegTab({
   extensions,
+  limitations = [],
 }: {
   extensions: readonly string[];
+  limitations?: readonly string[];
 }) {
   const { t } = useTranslation();
   const config = useSnapshot(createTaskDraft).jpeg;
@@ -22,7 +24,11 @@ export default function JpegTab({
   }
 
   return (
-    <EncoderPanel description={t("jpegDescription")} extensions={extensions}>
+    <EncoderPanel
+      description={t("jpegDescription")}
+      extensions={extensions}
+      limitations={limitations}
+    >
       <TabCard
         title={t("quality")}
         value={config.quality}
