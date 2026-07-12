@@ -23,9 +23,11 @@ export default function TabCard({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="h-[72px] w-36 border bg-white rounded-lg flex flex-col justify-between select-none px-2 py-1 text-[0.775rem]">
-      <span className="flex justify-between items-center">
-        <p className="font-bold">{title}</p>
+    <div className="flex h-[72px] min-w-0 w-full flex-col justify-between rounded-lg border bg-white px-2 py-1 text-[0.775rem] select-none">
+      <span className="flex min-w-0 items-center justify-between gap-1">
+        <p className="min-w-0 truncate font-bold" title={title}>
+          {title}
+        </p>
         {variant === "boolean" && (
           <Switch
             size="sm"

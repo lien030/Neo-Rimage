@@ -95,28 +95,46 @@ function DataTable<TData, TValue>({
       minSize: 100,
     },
   });
+  const minimumTableWidth = table
+    .getAllLeafColumns()
+    .reduce(
+      (width, column) => width + (column.columnDef.minSize ?? 0),
+      0,
+    );
 
   return (
-    <Table className="select-none">
-      <TableHeader className="sticky top-0 bg-background drop-shadow">
+    <Table
+      className="select-none"
+      containerClassName="h-full overflow-auto"
+      style={{ minWidth: minimumTableWidth }}
+    >
+      <TableHeader className="sticky top-0 z-10 bg-background drop-shadow">
         {table.getHeaderGroups().map((headerGroup) => (
           <TableRow key={headerGroup.id}>
-            {headerGroup.headers.map((header) => (
-              <TableHead
-                key={header.id}
-                style={{
-                  width: header.column.getSize(),
-                  minWidth: header.column.getSize(),
-                }}
-              >
-                {header.isPlaceholder
-                  ? null
-                  : flexRender(
-                      header.column.columnDef.header,
-                      header.getContext(),
-                    )}
-              </TableHead>
-            ))}
+            {headerGroup.headers.map((header) => {
+              const isStatusColumn = header.column.id === "status";
+
+              return (
+                <TableHead
+                  key={header.id}
+                  className={isStatusColumn ? "w-8 px-1" : undefined}
+                  style={{
+                    width: isStatusColumn ? header.column.getSize() : undefined,
+                    minWidth: header.column.columnDef.minSize,
+                    maxWidth: isStatusColumn
+                      ? header.column.getSize()
+                      : undefined,
+                  }}
+                >
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
+                </TableHead>
+              );
+            })}
           </TableRow>
         ))}
       </TableHeader>
@@ -124,18 +142,25 @@ function DataTable<TData, TValue>({
         {table.getRowModel().rows.length ? (
           table.getRowModel().rows.map((row) => (
             <TableRow key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <TableCell
-                  key={cell.id}
-                  style={{
-                    width: cell.column.getSize(),
-                    minWidth: cell.column.getSize(),
-                    maxWidth: cell.column.getSize(),
-                  }}
-                >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-              ))}
+              {row.getVisibleCells().map((cell) => {
+                const isStatusColumn = cell.column.id === "status";
+
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className={isStatusColumn ? "w-8 px-1" : undefined}
+                    style={{
+                      width: isStatusColumn ? cell.column.getSize() : undefined,
+                      minWidth: cell.column.columnDef.minSize,
+                      maxWidth: isStatusColumn
+                        ? cell.column.getSize()
+                        : undefined,
+                    }}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                );
+              })}
             </TableRow>
           ))
         ) : (
@@ -234,7 +259,7 @@ export default function TaskTable() {
       : backend.lastError ?? "Synchronizing backend jobs…";
 
   return (
-    <div className="w-full h-[488px] border rounded-lg bg-background overflow-hidden">
+    <div className="min-h-0 w-full flex-1 overflow-hidden rounded-lg border bg-background">
       <DataTable columns={columns} data={jobs} emptyMessage={emptyMessage} />
     </div>
   );

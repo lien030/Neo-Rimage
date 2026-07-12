@@ -86,8 +86,8 @@ function App() {
 
   function DragDropActive() {
     return (
-      <div className="absolute w-full h-full pt-14 bg-black/10 border flex justify-center items-center gap-2">
-        <div className="w-[94%] h-[90%] bg-white p-4 border-2 border-dashed rounded-lg flex flex-col justify-center items-center relative">
+      <div className="absolute inset-x-0 bottom-0 top-14 z-20 bg-black/10 p-4">
+        <div className="relative flex h-full w-full flex-col items-center justify-center rounded-lg border-2 border-dashed bg-white p-4">
           <Button
             variant={"ghost"}
             className="absolute right-2 top-2 px-2"
@@ -176,12 +176,12 @@ function App() {
   }
 
   return (
-    <div className="inset-0 w-screen h-screen bg-transparent border relative overflow-hidden">
-      <main className="h-full w-full flex flex-col relative">
-        <div className="h-14" />
-        <div className="w-full grow grid grid-cols-[auto_240px]">
-          <div className="px-4 pb-4 flex flex-col">
-            <div className="flex justify-between h-9">
+    <div className="relative inset-0 h-screen w-screen overflow-hidden border bg-transparent">
+      <main className="relative flex h-full min-h-0 w-full flex-col">
+        <div className="h-14 shrink-0" />
+        <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_clamp(240px,30vw,360px)]">
+          <div className="flex min-h-0 min-w-0 flex-col px-4 pb-4">
+            <div className="flex h-9 shrink-0 justify-between">
               <span className="flex gap-2 mx-2">
                 <ScrollText
                   className="text-primary"
@@ -236,15 +236,15 @@ function App() {
             </div>
             <TaskTable />
           </div>
-          <div className="pb-4 pr-4 flex flex-col">
-            <div className="grid h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-2">
-              <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+          <div className="flex min-h-0 min-w-0 flex-col pb-4 pr-4">
+            <div className="grid h-9 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-2">
+              <span className="flex min-w-0 items-center gap-1 whitespace-nowrap">
                 <Pickaxe
                   className="shrink-0 text-primary"
                   size={22}
                   strokeWidth={1.5}
                 />
-                <p className="truncate text-primary font-bold tracking-wide">
+                <p className="truncate text-primary font-bold">
                   {t("workers")}
                 </p>
                 {scheduler && (
@@ -254,7 +254,7 @@ function App() {
                   </p>
                 )}
               </span>
-              <span className="flex shrink-0 gap-2">
+              <span className="flex shrink-0 gap-1">
                 <Button
                   size="icon-sm"
                   className="size-7 rounded-lg border text-muted-foreground"
@@ -285,7 +285,7 @@ function App() {
             </div>
             <WorkerList />
             <Button
-              className={`mt-4 transition-all ${
+              className={`mt-4 shrink-0 transition-all ${
                 schedulerRunning
                   ? "bg-red-50 hover:bg-red-100 border border-red-600"
                   : ""

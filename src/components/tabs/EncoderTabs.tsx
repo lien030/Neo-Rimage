@@ -105,7 +105,7 @@ export default function EncoderTabs({
         markCreateTaskDirty();
       }}
     >
-      <TabsList className="my-1 grid w-full grid-cols-[repeat(auto-fit,minmax(4.5rem,1fr))] gap-0.5 group-data-horizontal/tabs:h-auto group-data-horizontal/tabs:min-h-14">
+      <TabsList className="my-1 grid w-full auto-rows-[1.5rem] grid-cols-[repeat(auto-fit,minmax(4.5rem,1fr))] gap-0.5 group-data-horizontal/tabs:h-auto">
         {capabilities.map((capability) => (
           <TabsTrigger
             key={capability.kind}

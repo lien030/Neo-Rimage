@@ -146,7 +146,7 @@ export default function CreateTaskDialog() {
       }}
     >
       <DialogContent
-        className="h-[540px] w-[calc(100%-2rem)] max-w-none overflow-hidden sm:max-w-[calc(100%-2rem)] flex flex-col"
+        className="flex h-[min(90vh,900px)] w-[min(96vw,1440px)] max-w-none flex-col overflow-hidden sm:max-w-none"
         showCloseButton={!ui.isSubmitting}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
@@ -159,8 +159,8 @@ export default function CreateTaskDialog() {
           <DialogTitle className="select-none">{t("createTask")}</DialogTitle>
         </DialogHeader>
 
-        <div className="w-full min-h-0 flex-1 grid grid-cols-[200px_minmax(0,1fr)] gap-4">
-          <div className="flex flex-col border rounded-lg overflow-x-hidden overflow-y-auto select-none">
+        <div className="grid min-h-0 w-full flex-1 grid-cols-[clamp(200px,22vw,320px)_minmax(0,1fr)] gap-4">
+          <div className="flex min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-lg border select-none">
             {taskStore.taskCache.length === 0 ? (
               <p className="m-auto px-4 text-center text-xs text-muted-foreground">
                 {t("createTaskNoInputs")}
@@ -178,19 +178,19 @@ export default function CreateTaskDialog() {
             )}
           </div>
 
-          <div className="min-w-0 min-h-0 flex flex-col select-none">
+          <div className="flex min-h-0 min-w-0 flex-col select-none">
             <span className="flex items-center gap-1">
               <Settings size={18} />
               <p className="text-sm font-bold">{t("outputSettings")}</p>
             </span>
-            <div className="min-h-0 grid grid-rows-[minmax(0,1fr)_190px] grow gap-3">
+            <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(190px,max-content)] gap-3">
               <EncoderTabs
                 capabilities={encoderCapabilities}
                 syncStatus={backend.syncStatus}
                 lastError={backend.lastError}
               />
 
-              <div className="grid grid-cols-[180px_minmax(0,1fr)] gap-3">
+              <div className="grid min-h-0 min-w-0 grid-cols-[clamp(180px,26%,256px)_minmax(0,1fr)] gap-3">
                 <ResizeCard />
                 <OutputCard
                   isSubmitting={ui.isSubmitting}
@@ -208,7 +208,7 @@ export default function CreateTaskDialog() {
         </div>
 
         {ui.globalError && (
-          <DialogFooter className="sm:justify-start">
+          <DialogFooter className="max-h-12 shrink-0 overflow-y-auto pr-1 sm:justify-start">
             <div
               role="alert"
               className="flex min-w-0 items-start gap-2 text-xs text-destructive"
@@ -387,7 +387,7 @@ function OutputCard({
   return (
     <div className="flex min-w-0 flex-col gap-0.5 rounded-lg border px-3 py-1.5">
       <p className="text-sm font-bold">{t("output")}</p>
-      <div className="grid min-w-0 grid-cols-[80px_minmax(0,1fr)_72px] gap-2">
+      <div className="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)_max-content] gap-2">
         <Select
           value={output.locationMode}
           disabled={isSubmitting}
@@ -401,7 +401,7 @@ function OutputCard({
             }
           }}
         >
-          <SelectTrigger className="h-7 min-w-0 px-2 text-xs">
+          <SelectTrigger className="h-7 min-w-0 max-w-full px-2 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -423,7 +423,7 @@ function OutputCard({
         <Button
           type="button"
           variant="outline"
-          className="h-7 px-2 text-xs"
+          className="h-7 whitespace-nowrap px-2 text-xs"
           disabled={!isDirectory || isSubmitting}
           onClick={handleSelectOutputDirectory}
         >

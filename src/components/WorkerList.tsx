@@ -36,8 +36,8 @@ export default function WorkerList() {
   const workers = backend.snapshot?.workerSlots ?? [];
 
   return (
-    <div className="w-full grow max-h-[438px] px-2 rounded-lg bg-background/50">
-      <div className="w-full h-full pt-2 flex flex-col overflow-y-auto gap-2">
+    <div className="min-h-0 w-full flex-1 rounded-lg bg-background/50 px-2">
+      <div className="flex h-full min-h-0 w-full flex-col gap-2 overflow-y-auto py-2">
         {workers.length === 0 && (
           <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
             {backend.syncStatus === "ready"
@@ -62,11 +62,11 @@ function WorkerCard({ worker }: { worker: WorkerSlotSnapshot }) {
       : "Idle";
 
   return (
-    <div className="min-h-12 w-full grid grid-cols-[36px_auto] border border-zinc-300 bg-muted-foreground/5 rounded-sm">
+    <div className="grid min-h-12 w-full grid-cols-[36px_minmax(0,1fr)] rounded-sm border border-zinc-300 bg-muted-foreground/5">
       <figure className="flex justify-center items-center">
         <div className={`h-2 w-2 rounded-full ${lampColor(worker.status)}`} />
       </figure>
-      <div className="min-w-0 py-1 flex flex-col justify-center">
+      <div className="flex min-w-0 flex-col justify-center overflow-hidden py-1">
         <p className="text-sm truncate">{itemLabel}</p>
         {activity && (
           <p className="text-xs text-muted-foreground truncate">{activity}</p>

@@ -51,7 +51,7 @@ export function EncoderPanel({
           {limitationLabels.join(" · ")}
         </p>
       )}
-      <div className="flex min-h-0 w-full flex-1 content-start gap-2 overflow-y-auto pr-1 flex-wrap">
+      <div className="grid min-h-0 w-full flex-1 auto-rows-max grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] content-start gap-2 overflow-y-auto pr-1">
         {children}
       </div>
     </div>
@@ -75,7 +75,7 @@ export function OptionlessEncoderPanel({
       extensions={extensions}
       limitations={limitations}
     >
-      <div className="flex min-h-28 w-full items-center justify-center rounded-lg border border-dashed px-6 text-center text-muted-foreground">
+      <div className="col-span-full flex min-h-28 w-full items-center justify-center rounded-lg border border-dashed px-6 text-center text-muted-foreground">
         <div className="flex max-w-sm flex-col items-center gap-2">
           <SlidersHorizontal className="size-5" />
           <p className="text-xs">{t("encoderNoSpecificOptions")}</p>
