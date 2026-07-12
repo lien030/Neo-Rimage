@@ -79,7 +79,7 @@
   "outputDirectory": "输出目录",
   "collisionPolicy": "冲突策略",
   "collisionPolicyDescription": "输出目录中已经存在同名文件时的处理方式。",
-  "collisionFail": "不覆盖",
+  "collisionFail": "已存在则失败",
   "collisionReplace": "直接覆盖",
   "collisionAutoRename": "自动重命名",
   "preserveStructure": "保留目录结构",

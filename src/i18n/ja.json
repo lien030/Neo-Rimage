@@ -79,7 +79,7 @@
   "outputDirectory": "出力ディレクトリ",
   "collisionPolicy": "競合時の処理",
   "collisionPolicyDescription": "出力先に同名ファイルが存在する場合の処理方法です。",
-  "collisionFail": "上書きしない",
+  "collisionFail": "既にあれば失敗",
   "collisionReplace": "上書き",
   "collisionAutoRename": "自動リネーム",
   "preserveStructure": "ディレクトリ構造を保持",

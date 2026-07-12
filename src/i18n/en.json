@@ -79,7 +79,7 @@
   "outputDirectory": "Output directory",
   "collisionPolicy": "Conflict policy",
   "collisionPolicyDescription": "Controls what happens when a file with the same name already exists in the output directory.",
-  "collisionFail": "Do not overwrite",
+  "collisionFail": "Fail if exists",
   "collisionReplace": "Overwrite",
   "collisionAutoRename": "Auto rename",
   "preserveStructure": "Preserve structure",

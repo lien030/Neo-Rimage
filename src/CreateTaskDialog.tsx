@@ -88,27 +88,6 @@ export default function CreateTaskDialog() {
     }
   }, [availableEncoderKinds, draft.activeEncoder]);
 
-  useEffect(() => {
-    if (!app.isShowCreateTask || createTaskDraft.output.outputDirectory.trim()) {
-      return;
-    }
-
-    let cancelled = false;
-    void desktopDir()
-      .then((path) => {
-        if (!cancelled && !createTaskDraft.output.outputDirectory.trim()) {
-          createTaskDraft.output.outputDirectory = path;
-        }
-      })
-      .catch(() => {
-        // Keep the field empty if the platform cannot resolve a desktop path.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [app.isShowCreateTask]);
-
   function discardAndClose() {
     if (createTaskUiState.isSubmitting) return;
     taskState.taskCache = [];
@@ -360,21 +339,48 @@ function OutputCard({
     markCreateTaskDirty();
   }
 
+  async function ensureDesktopDefaultDirectory() {
+    if (createTaskDraft.output.outputDirectory.trim()) return;
+    try {
+      const path = await desktopDir();
+      if (
+        createTaskUiState.isOpen &&
+        !createTaskUiState.isSubmitting &&
+        !createTaskDraft.output.outputDirectory.trim()
+      ) {
+        createTaskDraft.output.outputDirectory = path;
+      }
+    } catch {
+      // Keep the field empty if the platform cannot resolve a desktop path.
+    }
+  }
+
   async function handleSelectOutputDirectory() {
+    if (isSubmitting || !isDirectory) return;
+
     try {
       const selected = await open({
         directory: true,
         multiple: false,
         defaultPath: output.outputDirectory || undefined,
       });
-      if (typeof selected !== "string") return;
+      // Ignore late results after submit/reset/close or cancel (null).
+      if (
+        !createTaskUiState.isOpen ||
+        createTaskUiState.isSubmitting ||
+        typeof selected !== "string"
+      ) {
+        return;
+      }
 
       update(() => {
         createTaskDraft.output.locationMode = "directory";
         createTaskDraft.output.outputDirectory = selected;
       });
     } catch {
-      createTaskUiState.globalError = t("createTaskErrorDirectoryPicker");
+      if (createTaskUiState.isOpen && !createTaskUiState.isSubmitting) {
+        createTaskUiState.globalError = t("createTaskErrorDirectoryPicker");
+      }
     }
   }
 
@@ -384,13 +390,16 @@ function OutputCard({
       <div className="grid min-w-0 grid-cols-[80px_minmax(0,1fr)_72px] gap-2">
         <Select
           value={output.locationMode}
-          onValueChange={(value) =>
+          disabled={isSubmitting}
+          onValueChange={(value) => {
+            const mode = value as "same_directory" | "directory";
             update(() => {
-              createTaskDraft.output.locationMode = value as
-                | "same_directory"
-                | "directory";
-            })
-          }
+              createTaskDraft.output.locationMode = mode;
+            });
+            if (mode === "directory") {
+              void ensureDesktopDefaultDirectory();
+            }
+          }}
         >
           <SelectTrigger className="h-7 min-w-0 px-2 text-xs">
             <SelectValue />
@@ -402,7 +411,7 @@ function OutputCard({
         </Select>
         <Input
           value={output.outputDirectory}
-          disabled={!isDirectory}
+          disabled={!isDirectory || isSubmitting}
           placeholder={t("outputDirectory")}
           className="h-7 min-w-0 px-2 text-xs"
           onChange={(event) =>
@@ -415,7 +424,7 @@ function OutputCard({
           type="button"
           variant="outline"
           className="h-7 px-2 text-xs"
-          disabled={!isDirectory}
+          disabled={!isDirectory || isSubmitting}
           onClick={handleSelectOutputDirectory}
         >
           {t("selectDirectory")}
