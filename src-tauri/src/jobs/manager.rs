@@ -980,6 +980,7 @@ fn snapshot_slot(state: &State, index: usize, slot: &SlotRecord) -> WorkerSlotSn
             (None, _) => WorkerSlotStatus::Idle,
         },
         item_id: slot.item_id.clone(),
+        input_path: item.map(|item| path_text(&item.spec.input_path)),
         stage: item.and_then(|item| item.stage),
         progress: item.and_then(|item| item.progress.clone()),
     }

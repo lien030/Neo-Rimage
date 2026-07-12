@@ -1,9 +1,16 @@
 import { useBackendRuntimeState } from "@/lib/State";
 import type {
   ItemProgress,
+  ProcessingStage,
   WorkerSlotSnapshot,
   WorkerSlotStatus,
 } from "@/lib/ipc";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { inputFileName } from "./worker-display";
 
 function lampColor(status: WorkerSlotStatus) {
   switch (status) {
@@ -16,9 +23,12 @@ function lampColor(status: WorkerSlotStatus) {
   }
 }
 
-function progressText(progress: ItemProgress | null) {
+function progressText(
+  progress: ItemProgress | null,
+  stage: ProcessingStage | null,
+) {
   if (!progress) {
-    return null;
+    return stage;
   }
 
   if (progress.measure.kind === "fraction" && progress.measure.total > 0) {
@@ -54,12 +64,14 @@ export default function WorkerList() {
 }
 
 function WorkerCard({ worker }: { worker: WorkerSlotSnapshot }) {
-  const activity = progressText(worker.progress);
-  const itemLabel = worker.itemId
-    ? `#${worker.itemId.slice(0, 8)}`
-    : worker.status === "draining"
-      ? "Draining"
-      : "Idle";
+  const activity = progressText(worker.progress, worker.stage);
+  const itemLabel = worker.inputPath
+    ? inputFileName(worker.inputPath)
+    : worker.itemId
+      ? `#${worker.itemId.slice(0, 8)}`
+      : worker.status === "draining"
+        ? "Draining"
+        : "Idle";
 
   return (
     <div className="grid min-h-12 w-full grid-cols-[36px_minmax(0,1fr)] rounded-sm border border-zinc-300 bg-muted-foreground/5">
@@ -67,7 +79,18 @@ function WorkerCard({ worker }: { worker: WorkerSlotSnapshot }) {
         <div className={`h-2 w-2 rounded-full ${lampColor(worker.status)}`} />
       </figure>
       <div className="flex min-w-0 flex-col justify-center overflow-hidden py-1">
-        <p className="text-sm truncate">{itemLabel}</p>
+        {worker.inputPath ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className="truncate text-sm">{itemLabel}</p>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="max-w-sm break-all">
+              <p>{worker.inputPath}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <p className="truncate text-sm">{itemLabel}</p>
+        )}
         {activity && (
           <p className="text-xs text-muted-foreground truncate">{activity}</p>
         )}

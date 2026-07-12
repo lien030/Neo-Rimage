@@ -124,6 +124,8 @@ pub struct WorkerSlotSnapshot {
     pub id: WorkerSlotId,
     pub status: WorkerSlotStatus,
     pub item_id: Option<ItemId>,
+    #[serde(default)]
+    pub input_path: Option<String>,
     pub stage: Option<ProcessingStage>,
     pub progress: Option<ItemProgress>,
 }

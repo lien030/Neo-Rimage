@@ -285,6 +285,7 @@ export interface WorkerSlotSnapshot {
   readonly id: WorkerSlotId;
   readonly status: WorkerSlotStatus;
   readonly itemId: ItemId | null;
+  readonly inputPath: string | null;
   readonly stage: ProcessingStage | null;
   readonly progress: ItemProgress | null;
 }

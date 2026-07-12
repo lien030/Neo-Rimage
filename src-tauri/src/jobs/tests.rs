@@ -219,6 +219,11 @@ fn active_execution_never_exceeds_the_configured_budget() {
     let running = manager.snapshot();
     assert_eq!(running.scheduler.active_items, 2);
     assert_eq!(running.worker_slots.len(), 2);
+    assert!(running.worker_slots.iter().all(|slot| {
+        slot.input_path
+            .as_deref()
+            .is_some_and(|path| path.starts_with("input-") && path.ends_with(".png"))
+    }));
 
     executor.gate.release(8);
     manager
@@ -242,12 +247,18 @@ fn lowering_concurrency_marks_busy_slots_as_draining() {
     assert_eq!(snapshot.worker_slots[0].status, WorkerSlotStatus::Busy);
     assert_eq!(snapshot.worker_slots[1].status, WorkerSlotStatus::Draining);
     assert_eq!(snapshot.worker_slots[2].status, WorkerSlotStatus::Draining);
+    assert!(snapshot
+        .worker_slots
+        .iter()
+        .all(|slot| slot.input_path.is_some()));
 
     executor.gate.release(3);
     manager
         .wait_for_job_terminal(&job_id, TEST_TIMEOUT)
         .expect("job completes");
-    assert_eq!(manager.snapshot().worker_slots.len(), 1);
+    let idle = manager.snapshot();
+    assert_eq!(idle.worker_slots.len(), 1);
+    assert_eq!(idle.worker_slots[0].input_path, None);
 }
 
 #[test]
