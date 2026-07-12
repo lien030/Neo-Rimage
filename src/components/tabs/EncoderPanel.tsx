@@ -1,14 +1,17 @@
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Lightbulb, SlidersHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export function EncoderPanel({
   description,
   extensions,
+  fillContent = false,
   children,
 }: {
   description: string;
   extensions: readonly string[];
+  fillContent?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -34,7 +37,14 @@ export function EncoderPanel({
           </Badge>
         ))}
       </div>
-      <div className="grid min-h-0 w-full flex-1 auto-rows-max grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] content-start gap-2 overflow-y-auto pr-1">
+      <div
+        className={cn(
+          "grid min-h-0 w-full flex-1 grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2 overflow-y-auto pr-1",
+          fillContent
+            ? "grid-rows-[minmax(0,1fr)] content-stretch"
+            : "auto-rows-max content-start",
+        )}
+      >
         {children}
       </div>
     </div>
@@ -54,8 +64,9 @@ export function OptionlessEncoderPanel({
     <EncoderPanel
       description={description}
       extensions={extensions}
+      fillContent
     >
-      <div className="col-span-full flex min-h-28 w-full items-center justify-center rounded-lg border border-dashed px-6 text-center text-muted-foreground">
+      <div className="col-span-full flex h-full min-h-28 w-full items-center justify-center rounded-lg border border-dashed px-6 text-center text-muted-foreground">
         <div className="flex max-w-sm flex-col items-center gap-2">
           <SlidersHorizontal className="size-5" />
           <p className="text-xs">{t("encoderNoSpecificOptions")}</p>
