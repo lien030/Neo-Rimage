@@ -5,9 +5,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Copy as RestoreIcon,
   Languages,
   Maximize2,
-  Minimize2,
   Minus,
   Pin,
   PinOff,
@@ -18,10 +18,18 @@ import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import i18n from "@/i18n/config";
+import { useTranslation } from "react-i18next";
 
 export default function TitleBar() {
+  const { t } = useTranslation();
   const [isPinned, setIsPinned] = useState<boolean>(false);
   const [isMaximized, setIsMaximized] = useState<boolean>(false);
+
+  const languageLabel = t("changeLanguage");
+  const pinLabel = t(isPinned ? "unpinWindow" : "pinWindow");
+  const minimizeLabel = t("minimizeWindow");
+  const maximizeLabel = t(isMaximized ? "restoreWindow" : "maximizeWindow");
+  const closeLabel = t("closeWindow");
 
   useEffect(() => {
     void getCurrentWindow().setAlwaysOnTop(isPinned);
@@ -95,6 +103,8 @@ export default function TitleBar() {
               variant="ghost"
               size="icon"
               className="hover:bg-zinc-200/50 h-8 w-8"
+              aria-label={languageLabel}
+              title={languageLabel}
             >
               <Languages color="#888888" size={20} />
             </Button>
@@ -131,6 +141,8 @@ export default function TitleBar() {
           size="icon"
           className="hover:bg-zinc-200/50 h-8 w-8"
           onClick={handleWindowPinned}
+          aria-label={pinLabel}
+          title={pinLabel}
         >
           {isPinned ? (
             <Pin size={18} color="#888888" />
@@ -143,6 +155,8 @@ export default function TitleBar() {
           size="icon"
           className="hover:bg-zinc-200/50 h-8 w-8"
           onClick={handleWindowMinimize}
+          aria-label={minimizeLabel}
+          title={minimizeLabel}
         >
           <Minus size={18} color="#888888" />
         </Button>
@@ -151,11 +165,11 @@ export default function TitleBar() {
           size="icon"
           className="hover:bg-zinc-200/50 h-8 w-8"
           onClick={handleWindowMaximize}
-          aria-label={isMaximized ? "Restore window" : "Maximize window"}
-          title={isMaximized ? "Restore" : "Maximize"}
+          aria-label={maximizeLabel}
+          title={maximizeLabel}
         >
           {isMaximized ? (
-            <Minimize2 size={18} color="#888888" />
+            <RestoreIcon size={17} color="#888888" />
           ) : (
             <Maximize2 size={18} color="#888888" />
           )}
@@ -165,6 +179,8 @@ export default function TitleBar() {
           size="icon"
           className="hover:bg-zinc-200/50 h-8 w-8"
           onClick={handleWindowClosed}
+          aria-label={closeLabel}
+          title={closeLabel}
         >
           <X size={18} color="#888888" />
         </Button>

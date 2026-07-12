@@ -183,7 +183,7 @@ export default function CreateTaskDialog() {
               <Settings size={18} />
               <p className="text-sm font-bold">{t("outputSettings")}</p>
             </span>
-            <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(190px,max-content)] gap-3">
+            <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_190px] gap-3">
               <EncoderTabs
                 capabilities={encoderCapabilities}
                 syncStatus={backend.syncStatus}

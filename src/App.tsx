@@ -176,7 +176,7 @@ function App() {
   }
 
   return (
-    <div className="relative inset-0 h-screen w-screen overflow-hidden border bg-transparent">
+    <div className="relative h-screen w-screen overflow-hidden border bg-transparent">
       <main className="relative flex h-full min-h-0 w-full flex-col">
         <div className="h-14 shrink-0" />
         <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_clamp(240px,30vw,360px)]">
