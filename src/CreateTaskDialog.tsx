@@ -57,6 +57,13 @@ export default function CreateTaskDialog() {
   // for the full capability contract. Keep the cast local to this read-only view.
   const backend = useBackendRuntimeState() as unknown as {
     readonly capabilities: BackendCapabilities | null;
+    readonly syncStatus:
+      | "idle"
+      | "syncing"
+      | "ready"
+      | "needs_resync"
+      | "unavailable";
+    readonly lastError: string | null;
   };
   const { t } = useTranslation();
   const encoderCapabilities = backend.capabilities?.encoders ?? null;
@@ -68,6 +75,8 @@ export default function CreateTaskDialog() {
     [encoderCapabilities],
   );
 
+  // Single owner of draft.activeEncoder alignment when capabilities change.
+  // Do not mark dirty: this is a system correction, not a user edit.
   useEffect(() => {
     if (
       availableEncoderKinds.length > 0 &&
@@ -169,7 +178,11 @@ export default function CreateTaskDialog() {
               <p className="text-sm font-bold">{t("outputSettings")}</p>
             </span>
             <div className="min-h-0 grid grid-rows-[minmax(0,1fr)_190px] grow gap-3">
-              <EncoderTabs capabilities={encoderCapabilities} />
+              <EncoderTabs
+                capabilities={encoderCapabilities}
+                syncStatus={backend.syncStatus}
+                lastError={backend.lastError}
+              />
 
               <div className="grid grid-cols-[180px_minmax(0,1fr)] gap-3">
                 <ResizeCard />

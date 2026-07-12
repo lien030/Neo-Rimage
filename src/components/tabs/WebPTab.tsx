@@ -40,6 +40,7 @@ export default function WebPTab({
         value={config.quality}
         min={1}
         max={100}
+        disabled={config.lossless}
         onValueChange={(value) =>
           update(() => {
             createTaskDraft.webp.quality = String(value);

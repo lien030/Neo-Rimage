@@ -17,6 +17,8 @@
   "qoiDescription": "8ビットRGBまたはRGBAの高速ロスレスQOIにエンコード",
   "encoderNoSpecificOptions": "この形式にはエンコーダー固有の設定がありません。下のサイズ変更と出力設定は引き続き適用されます。",
   "loadingEncoderCapabilities": "利用可能な出力形式を読み込み中...",
+  "encoderCapabilitiesUnavailable": "バックエンドから利用可能な出力形式を読み込めませんでした。",
+  "aligningEncoderSelection": "選択中の出力形式を更新しています...",
   "noEncodersAvailable": "現在のバックエンドには利用可能な出力エンコーダーがありません。",
   "encoderUnavailable": "現在のバックエンドビルドでは利用できません",
   "progressive": "プログレッシブ",

@@ -3,6 +3,7 @@ import {
   createTaskDraft,
   markCreateTaskDirty,
 } from "@/features/create-task";
+import type { BackendSyncStatus } from "@/features/backend";
 import type {
   EncoderCapability,
   EncoderKind,
@@ -40,33 +41,53 @@ const OPTIONLESS_DESCRIPTION_KEYS: Partial<Record<EncoderKind, string>> = {
 
 export default function EncoderTabs({
   capabilities,
+  syncStatus,
+  lastError,
 }: {
   capabilities: readonly EncoderCapability[] | null;
+  syncStatus: BackendSyncStatus;
+  lastError: string | null;
 }) {
   const { t } = useTranslation();
   const draft = useSnapshot(createTaskDraft);
 
   if (!capabilities) {
+    const failed =
+      syncStatus === "unavailable" || syncStatus === "needs_resync";
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg border text-xs text-muted-foreground">
-        {t("loadingEncoderCapabilities")}
+      <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg border px-6 text-center text-xs text-muted-foreground">
+        <div className="flex max-w-sm flex-col gap-1">
+          <p>
+            {failed
+              ? t("encoderCapabilitiesUnavailable")
+              : t("loadingEncoderCapabilities")}
+          </p>
+          {failed && lastError ? (
+            <p className="text-[0.65rem] text-destructive/80" title={lastError}>
+              {lastError}
+            </p>
+          ) : null}
+        </div>
       </div>
     );
   }
 
-  const activeCapability = capabilities.find(
+  // Single source of truth: only render the draft's encoder. Parent aligns
+  // draft.activeEncoder when capabilities make the current choice unavailable.
+  const selectedCapability = capabilities.find(
     (capability) =>
       capability.kind === draft.activeEncoder && capability.available,
   );
-  const fallbackCapability = capabilities.find(
+  const hasAvailableEncoder = capabilities.some(
     (capability) => capability.available,
   );
-  const selectedCapability = activeCapability ?? fallbackCapability;
 
   if (!selectedCapability) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center rounded-lg border px-6 text-center text-xs text-muted-foreground">
-        {t("noEncodersAvailable")}
+        {hasAvailableEncoder
+          ? t("aligningEncoderSelection")
+          : t("noEncodersAvailable")}
       </div>
     );
   }
@@ -84,7 +105,7 @@ export default function EncoderTabs({
         markCreateTaskDirty();
       }}
     >
-      <TabsList className="my-1 grid w-full grid-cols-5 gap-0.5 group-data-horizontal/tabs:h-14">
+      <TabsList className="my-1 grid w-full grid-cols-[repeat(auto-fit,minmax(4.5rem,1fr))] gap-0.5 group-data-horizontal/tabs:h-auto group-data-horizontal/tabs:min-h-14">
         {capabilities.map((capability) => (
           <TabsTrigger
             key={capability.kind}

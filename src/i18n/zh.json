@@ -17,6 +17,8 @@
   "qoiDescription": "编码为快速无损 QOI，输出 8 位 RGB 或 RGBA",
   "encoderNoSpecificOptions": "此格式没有编码器专用参数，下方的调整大小和输出设置仍然有效。",
   "loadingEncoderCapabilities": "正在读取可用输出格式……",
+  "encoderCapabilitiesUnavailable": "无法从后端读取可用输出格式。",
+  "aligningEncoderSelection": "正在更新所选输出格式……",
   "noEncodersAvailable": "当前后端没有提供可用的输出编码器。",
   "encoderUnavailable": "当前后端构建不支持此格式",
   "progressive": "渐进式",

@@ -17,6 +17,8 @@
   "qoiDescription": "Encode fast lossless QOI output as 8-bit RGB or RGBA",
   "encoderNoSpecificOptions": "This format has no encoder-specific options. Resize and output settings below still apply.",
   "loadingEncoderCapabilities": "Loading available output formats...",
+  "encoderCapabilitiesUnavailable": "Could not load available output formats from the backend.",
+  "aligningEncoderSelection": "Updating the selected output format...",
   "noEncodersAvailable": "This backend does not provide any usable output encoder.",
   "encoderUnavailable": "Unavailable in the current backend build",
   "progressive": "Progressive",
