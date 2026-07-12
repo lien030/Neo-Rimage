@@ -5,6 +5,8 @@ import {
   useTaskStore,
 } from "@/lib/State";
 import { backendClient, createJobCommand } from "@/lib/ipc";
+import { desktopDir } from "@tauri-apps/api/path";
+import { open } from "@tauri-apps/plugin-dialog";
 import {
   CreateTaskValidationError,
   buildCreateJobRequest,
@@ -85,6 +87,27 @@ export default function CreateTaskDialog() {
       createTaskDraft.activeEncoder = availableEncoderKinds[0];
     }
   }, [availableEncoderKinds, draft.activeEncoder]);
+
+  useEffect(() => {
+    if (!app.isShowCreateTask || createTaskDraft.output.outputDirectory.trim()) {
+      return;
+    }
+
+    let cancelled = false;
+    void desktopDir()
+      .then((path) => {
+        if (!cancelled && !createTaskDraft.output.outputDirectory.trim()) {
+          createTaskDraft.output.outputDirectory = path;
+        }
+      })
+      .catch(() => {
+        // Keep the field empty if the platform cannot resolve a desktop path.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [app.isShowCreateTask]);
 
   function discardAndClose() {
     if (createTaskUiState.isSubmitting) return;
@@ -265,27 +288,30 @@ function ResizeCard() {
           })
         }
       />
-      <Select
-        value={resize.filter}
-        disabled={!resize.enabled}
-        onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.resize.filter = value as ResizeFilter;
-          })
-        }
-      >
-        <SelectTrigger className="h-7 px-2 text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="nearest">Nearest</SelectItem>
-          <SelectItem value="bilinear">Bilinear</SelectItem>
-          <SelectItem value="hamming">Hamming</SelectItem>
-          <SelectItem value="catmull_rom">Catmull-Rom</SelectItem>
-          <SelectItem value="mitchell">Mitchell</SelectItem>
-          <SelectItem value="lanczos3">Lanczos3</SelectItem>
-        </SelectContent>
-      </Select>
+      <div className="grid grid-cols-[1fr_100px] items-center gap-2 text-xs">
+        <span className="text-right">{t("filter")}</span>
+        <Select
+          value={resize.filter}
+          disabled={!resize.enabled}
+          onValueChange={(value) =>
+            update(() => {
+              createTaskDraft.resize.filter = value as ResizeFilter;
+            })
+          }
+        >
+          <SelectTrigger className="h-7 min-w-0 px-2 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="nearest">Nearest</SelectItem>
+            <SelectItem value="bilinear">Bilinear</SelectItem>
+            <SelectItem value="hamming">Hamming</SelectItem>
+            <SelectItem value="catmull_rom">Catmull-Rom</SelectItem>
+            <SelectItem value="mitchell">Mitchell</SelectItem>
+            <SelectItem value="lanczos3">Lanczos3</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
       <CompactSwitch
         label={t("allowUpscale")}
         description={t("allowUpscaleDescription")}
@@ -334,105 +360,166 @@ function OutputCard({
     markCreateTaskDirty();
   }
 
+  async function handleSelectOutputDirectory() {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        defaultPath: output.outputDirectory || undefined,
+      });
+      if (typeof selected !== "string") return;
+
+      update(() => {
+        createTaskDraft.output.locationMode = "directory";
+        createTaskDraft.output.outputDirectory = selected;
+      });
+    } catch {
+      createTaskUiState.globalError = t("createTaskErrorDirectoryPicker");
+    }
+  }
+
   return (
-    <div className="grid min-w-0 grid-cols-2 grid-rows-[auto_auto_auto_auto_auto_1fr] gap-x-3 gap-y-1 rounded-lg border px-3 py-2">
-      <p className="col-span-2 text-sm font-bold">{t("output")}</p>
-      <Select
-        value={output.locationMode}
-        onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.output.locationMode = value as
-              | "same_directory"
-              | "directory";
-          })
-        }
-      >
-        <SelectTrigger className="h-7 px-2 text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="same_directory">{t("sameDirectory")}</SelectItem>
-          <SelectItem value="directory">{t("customDirectory")}</SelectItem>
-        </SelectContent>
-      </Select>
-      <Input
-        value={output.outputDirectory}
-        disabled={!isDirectory}
-        placeholder={t("outputDirectory")}
-        className="h-7 px-2 text-xs"
-        onChange={(event) =>
-          update(() => {
-            createTaskDraft.output.outputDirectory = event.target.value;
-          })
-        }
-      />
-      <Input
-        value={output.suffix}
-        placeholder={t("suffix")}
-        className="h-7 px-2 text-xs"
-        onChange={(event) =>
-          update(() => {
-            createTaskDraft.output.suffix = event.target.value;
-          })
-        }
-      />
-      <Select
-        value={output.collision}
-        onValueChange={(value) =>
-          update(() => {
-            const collision = value as CollisionPolicy;
-            createTaskDraft.output.collision = collision;
-            if (collision !== "replace") {
-              createTaskDraft.output.sourceBackup = false;
-              createTaskDraft.output.existingOutputBackup = false;
-            }
-          })
-        }
-      >
-        <SelectTrigger className="h-7 px-2 text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="fail">{t("collisionFail")}</SelectItem>
-          <SelectItem value="replace">{t("collisionReplace")}</SelectItem>
-          <SelectItem value="auto_rename">{t("collisionAutoRename")}</SelectItem>
-        </SelectContent>
-      </Select>
-      <CompactSwitch
-        label={t("preserveStructure")}
-        checked={output.preserveStructure}
-        disabled={!isDirectory}
-        onCheckedChange={(checked) =>
-          update(() => {
-            createTaskDraft.output.preserveStructure = checked;
-          })
-        }
-      />
-      <CompactSwitch
-        label={t("sourceBackup")}
-        checked={output.sourceBackup}
-        disabled={!canBackup}
-        onCheckedChange={(checked) =>
-          update(() => {
-            createTaskDraft.output.sourceBackup = checked;
-          })
-        }
-      />
-      <CompactSwitch
-        label={t("existingOutputBackup")}
-        checked={output.existingOutputBackup}
-        disabled={!canBackup}
-        onCheckedChange={(checked) =>
-          update(() => {
-            createTaskDraft.output.existingOutputBackup = checked;
-          })
-        }
-      />
-      <div className="col-span-2 flex self-end justify-end gap-2 pt-1">
+    <div className="flex min-w-0 flex-col gap-0.5 rounded-lg border px-3 py-1.5">
+      <p className="text-sm font-bold">{t("output")}</p>
+      <div className="grid min-w-0 grid-cols-[80px_minmax(0,1fr)_72px] gap-2">
+        <Select
+          value={output.locationMode}
+          onValueChange={(value) =>
+            update(() => {
+              createTaskDraft.output.locationMode = value as
+                | "same_directory"
+                | "directory";
+            })
+          }
+        >
+          <SelectTrigger className="h-7 min-w-0 px-2 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="same_directory">{t("sameDirectory")}</SelectItem>
+            <SelectItem value="directory">{t("customDirectory")}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          value={output.outputDirectory}
+          disabled={!isDirectory}
+          placeholder={t("outputDirectory")}
+          className="h-7 min-w-0 px-2 text-xs"
+          onChange={(event) =>
+            update(() => {
+              createTaskDraft.output.outputDirectory = event.target.value;
+            })
+          }
+        />
         <Button
           type="button"
           variant="outline"
-          className="min-w-14"
+          className="h-7 px-2 text-xs"
+          disabled={!isDirectory}
+          onClick={handleSelectOutputDirectory}
+        >
+          {t("selectDirectory")}
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex min-w-0 flex-col">
+          <span className="flex items-center gap-1 text-[0.7rem]">
+            <span>{t("collisionPolicy")}</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="shrink-0 text-muted-foreground/70 transition-colors hover:text-foreground focus-visible:text-foreground"
+                  aria-label={t("collisionPolicyDescription")}
+                >
+                  <CircleHelp className="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                sideOffset={6}
+                className="max-w-64 leading-relaxed"
+              >
+                <p>{t("collisionPolicyDescription")}</p>
+              </TooltipContent>
+            </Tooltip>
+          </span>
+          <Select
+            value={output.collision}
+            onValueChange={(value) =>
+              update(() => {
+                const collision = value as CollisionPolicy;
+                createTaskDraft.output.collision = collision;
+                if (collision !== "replace") {
+                  createTaskDraft.output.sourceBackup = false;
+                  createTaskDraft.output.existingOutputBackup = false;
+                }
+              })
+            }
+          >
+            <SelectTrigger className="h-7 px-2 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fail">{t("collisionFail")}</SelectItem>
+              <SelectItem value="replace">{t("collisionReplace")}</SelectItem>
+              <SelectItem value="auto_rename">
+                {t("collisionAutoRename")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <label className="flex min-w-0 flex-col text-[0.7rem]">
+          <span>{t("suffix")}</span>
+          <Input
+            value={output.suffix}
+            placeholder={t("suffix")}
+            className="h-7 px-2 text-xs"
+            onChange={(event) =>
+              update(() => {
+                createTaskDraft.output.suffix = event.target.value;
+              })
+            }
+          />
+        </label>
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+        <CompactSwitch
+          label={t("preserveStructure")}
+          checked={output.preserveStructure}
+          disabled={!isDirectory}
+          onCheckedChange={(checked) =>
+            update(() => {
+              createTaskDraft.output.preserveStructure = checked;
+            })
+          }
+        />
+        <CompactSwitch
+          label={t("sourceBackup")}
+          checked={output.sourceBackup}
+          disabled={!canBackup}
+          onCheckedChange={(checked) =>
+            update(() => {
+              createTaskDraft.output.sourceBackup = checked;
+            })
+          }
+        />
+        <CompactSwitch
+          label={t("existingOutputBackup")}
+          checked={output.existingOutputBackup}
+          disabled={!canBackup}
+          onCheckedChange={(checked) =>
+            update(() => {
+              createTaskDraft.output.existingOutputBackup = checked;
+            })
+          }
+        />
+      </div>
+      <div className="mt-auto flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-7 min-w-14"
           disabled={isSubmitting}
           onClick={onCancel}
         >
@@ -440,7 +527,7 @@ function OutputCard({
         </Button>
         <Button
           type="button"
-          className="min-w-14"
+          className="h-7 min-w-14"
           disabled={!canCreate}
           onClick={onCreate}
         >

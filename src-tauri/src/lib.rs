@@ -31,6 +31,7 @@ pub fn run() {
     let shutdown_service = service.clone();
 
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(service)
         .setup(move |app| {
