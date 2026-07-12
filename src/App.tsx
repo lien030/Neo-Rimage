@@ -237,23 +237,27 @@ function App() {
             <TaskTable />
           </div>
           <div className="pb-4 pr-4 flex flex-col">
-            <div className="flex justify-between h-9">
-              <span className="flex gap-2 mx-2">
-                <Pickaxe className="text-primary" size={22} strokeWidth={1.5} />
-                <p className="text-primary font-bold tracking-wide">
+            <div className="grid h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-2">
+              <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                <Pickaxe
+                  className="shrink-0 text-primary"
+                  size={22}
+                  strokeWidth={1.5}
+                />
+                <p className="truncate text-primary font-bold tracking-wide">
                   {t("workers")}
                 </p>
                 {scheduler && (
-                  <p className="text-xs text-muted-foreground self-center">
+                  <p className="shrink-0 text-xs tabular-nums text-muted-foreground">
                     {scheduler.effectiveConcurrency}/
                     {scheduler.desiredConcurrency}
                   </p>
                 )}
               </span>
-              <span className="flex gap-2 mx-2">
+              <span className="flex shrink-0 gap-2">
                 <Button
-                  size={"icon"}
-                  className="text-muted-foreground border h-7 w-12 rounded-lg"
+                  size="icon-sm"
+                  className="size-7 rounded-lg border text-muted-foreground"
                   onClick={handleAddWorker}
                   disabled={
                     !backendReady ||
@@ -265,9 +269,9 @@ function App() {
                   <Plus size={16} className="text-white" />
                 </Button>
                 <Button
-                  size={"icon"}
+                  size="icon-sm"
                   onClick={handleRemoveWorker}
-                  className="text-muted-foreground bg-background hover:bg-muted-foreground/10 border h-7 w-10 rounded-lg"
+                  className="size-7 rounded-lg border bg-background text-muted-foreground hover:bg-muted-foreground/10"
                   disabled={
                     !backendReady ||
                     backendCommands.workerCountPending ||

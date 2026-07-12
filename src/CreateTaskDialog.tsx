@@ -43,8 +43,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import EncoderTabs from "@/components/tabs/EncoderTabs";
-import { AlertCircle, Settings, X } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { AlertCircle, CircleHelp, Settings, X } from "lucide-react";
+import { useEffect, useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useSnapshot } from "valtio";
 
@@ -121,7 +121,11 @@ export default function CreateTaskDialog() {
       createTaskUiState.isOpen = false;
       appState.isShowCreateTask = false;
     } catch (error) {
-      createTaskUiState.globalError = createTaskErrorMessage(error, t);
+      createTaskUiState.globalError =
+        error instanceof CreateTaskValidationError &&
+        error.code === "inputs_required"
+          ? null
+          : createTaskErrorMessage(error, t);
     } finally {
       createTaskUiState.isSubmitting = false;
     }
@@ -186,46 +190,32 @@ export default function CreateTaskDialog() {
 
               <div className="grid grid-cols-[180px_minmax(0,1fr)] gap-3">
                 <ResizeCard />
-                <OutputCard />
+                <OutputCard
+                  isSubmitting={ui.isSubmitting}
+                  canCreate={
+                    !ui.isSubmitting &&
+                    availableEncoderKinds.length > 0 &&
+                    availableEncoderKinds.includes(draft.activeEncoder)
+                  }
+                  onCancel={discardAndClose}
+                  onCreate={handleCreate}
+                />
               </div>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="relative min-h-16 items-center sm:justify-between">
-          <div className="min-w-0 flex-1">
-            {ui.globalError && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 text-xs text-destructive"
-              >
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <p>{ui.globalError}</p>
-              </div>
-            )}
-          </div>
-          <div className="flex shrink-0 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={ui.isSubmitting}
-              onClick={discardAndClose}
+        {ui.globalError && (
+          <DialogFooter className="sm:justify-start">
+            <div
+              role="alert"
+              className="flex min-w-0 items-start gap-2 text-xs text-destructive"
             >
-              {t("cancel")}
-            </Button>
-            <Button
-              type="button"
-              disabled={
-                ui.isSubmitting ||
-                availableEncoderKinds.length === 0 ||
-                !availableEncoderKinds.includes(draft.activeEncoder)
-              }
-              onClick={handleCreate}
-            >
-              {ui.isSubmitting ? t("creatingTask") : t("create")}
-            </Button>
-          </div>
-        </DialogFooter>
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <p className="min-w-0 break-words">{ui.globalError}</p>
+            </div>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -298,6 +288,7 @@ function ResizeCard() {
       </Select>
       <CompactSwitch
         label={t("allowUpscale")}
+        description={t("allowUpscaleDescription")}
         checked={resize.allowUpscale}
         disabled={!resize.enabled}
         onCheckedChange={(checked) =>
@@ -308,6 +299,7 @@ function ResizeCard() {
       />
       <CompactSwitch
         label={t("allowDownscale")}
+        description={t("allowDownscaleDescription")}
         checked={resize.allowDownscale}
         disabled={!resize.enabled}
         onCheckedChange={(checked) =>
@@ -320,7 +312,17 @@ function ResizeCard() {
   );
 }
 
-function OutputCard() {
+function OutputCard({
+  isSubmitting,
+  canCreate,
+  onCancel,
+  onCreate,
+}: {
+  isSubmitting: boolean;
+  canCreate: boolean;
+  onCancel: () => void;
+  onCreate: () => void | Promise<void>;
+}) {
   const { t } = useTranslation();
   const snap = useSnapshot(createTaskDraft);
   const output = snap.output;
@@ -333,7 +335,7 @@ function OutputCard() {
   }
 
   return (
-    <div className="border rounded-lg px-3 py-2 min-w-0 grid grid-cols-2 content-start gap-x-3 gap-y-1.5">
+    <div className="grid min-w-0 grid-cols-2 grid-rows-[auto_auto_auto_auto_auto_1fr] gap-x-3 gap-y-1 rounded-lg border px-3 py-2">
       <p className="col-span-2 text-sm font-bold">{t("output")}</p>
       <Select
         value={output.locationMode}
@@ -426,6 +428,25 @@ function OutputCard() {
           })
         }
       />
+      <div className="col-span-2 flex self-end justify-end gap-2 pt-1">
+        <Button
+          type="button"
+          variant="outline"
+          className="min-w-14"
+          disabled={isSubmitting}
+          onClick={onCancel}
+        >
+          {t("cancel")}
+        </Button>
+        <Button
+          type="button"
+          className="min-w-14"
+          disabled={!canCreate}
+          onClick={onCreate}
+        >
+          {isSubmitting ? t("creatingTask") : t("create")}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -459,25 +480,55 @@ function CompactNumberField({
 
 function CompactSwitch({
   label,
+  description,
   checked,
   disabled = false,
   onCheckedChange,
 }: {
   label: string;
+  description?: string;
   checked: boolean;
   disabled?: boolean;
   onCheckedChange: (checked: boolean) => void;
 }) {
+  const switchId = useId();
+
   return (
-    <label className="flex min-w-0 items-center justify-between gap-2 text-[0.7rem]">
-      <span className="truncate">{label}</span>
+    <div className="flex min-w-0 items-center justify-between gap-2 text-[0.7rem]">
+      <span className="flex min-w-0 items-center gap-1">
+        <label htmlFor={switchId} className="truncate">
+          {label}
+        </label>
+        {description && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="shrink-0 text-muted-foreground/70 transition-colors hover:text-foreground focus-visible:text-foreground"
+                aria-label={description}
+              >
+                <CircleHelp className="size-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              sideOffset={6}
+              className="max-w-64 leading-relaxed"
+            >
+              <p>{description}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </span>
       <Switch
+        id={switchId}
         size="sm"
+        aria-label={label}
         checked={checked}
         disabled={disabled}
         onCheckedChange={onCheckedChange}
       />
-    </label>
+    </div>
   );
 }
 
