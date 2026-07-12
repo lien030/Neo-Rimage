@@ -138,19 +138,19 @@ function EncoderPanelFor({
   capability: EncoderCapability;
 }) {
   const { t } = useTranslation();
-  const { outputExtensions: extensions, limitations } = capability;
+  const { outputExtensions: extensions } = capability;
 
   switch (capability.kind) {
     case "mozjpeg":
-      return <MozjpegTab extensions={extensions} limitations={limitations} />;
+      return <MozjpegTab extensions={extensions} />;
     case "jpeg":
-      return <JpegTab extensions={extensions} limitations={limitations} />;
+      return <JpegTab extensions={extensions} />;
     case "avif":
-      return <AvifTab extensions={extensions} limitations={limitations} />;
+      return <AvifTab extensions={extensions} />;
     case "oxipng":
-      return <OxiPngTab extensions={extensions} limitations={limitations} />;
+      return <OxiPngTab extensions={extensions} />;
     case "webp":
-      return <WebPTab extensions={extensions} limitations={limitations} />;
+      return <WebPTab extensions={extensions} />;
     case "jpeg_xl":
     case "png":
     case "farbfeld":
@@ -160,7 +160,6 @@ function EncoderPanelFor({
         <OptionlessEncoderPanel
           description={t(OPTIONLESS_DESCRIPTION_KEYS[capability.kind]!)}
           extensions={extensions}
-          limitations={limitations}
         />
       );
   }

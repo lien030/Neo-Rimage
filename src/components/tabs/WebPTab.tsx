@@ -10,10 +10,8 @@ import TabCard from "./TabCard";
 
 export default function WebPTab({
   extensions,
-  limitations = [],
 }: {
   extensions: readonly string[];
-  limitations?: readonly string[];
 }) {
   const { t } = useTranslation();
   const config = useSnapshot(createTaskDraft).webp;
@@ -27,7 +25,6 @@ export default function WebPTab({
     <EncoderPanel
       description={t("webpDescription")}
       extensions={extensions}
-      limitations={limitations}
     >
       <TabCard
         title={t("lossless")}

@@ -45,6 +45,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import EncoderTabs from "@/components/tabs/EncoderTabs";
+import { describeEncoderLimitation } from "@/components/tabs/encoder-limitations";
 import { AlertCircle, CircleHelp, Settings, X } from "lucide-react";
 import { useEffect, useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -76,6 +77,14 @@ export default function CreateTaskDialog() {
         .map((capability) => capability.kind) ?? [],
     [encoderCapabilities],
   );
+  const selectedEncoderLimitationText =
+    encoderCapabilities
+      ?.find(
+        (capability) =>
+          capability.kind === draft.activeEncoder && capability.available,
+      )
+      ?.limitations.map((code) => describeEncoderLimitation(code, t))
+      .join(" · ") ?? "";
 
   // Single owner of draft.activeEncoder alignment when capabilities change.
   // Do not mark dirty: this is a system correction, not a user edit.
@@ -179,10 +188,20 @@ export default function CreateTaskDialog() {
           </div>
 
           <div className="flex min-h-0 min-w-0 flex-col select-none">
-            <span className="flex items-center gap-1">
-              <Settings size={18} />
-              <p className="text-sm font-bold">{t("outputSettings")}</p>
-            </span>
+            <div className="flex h-5 min-w-0 items-center gap-1">
+              <Settings className="shrink-0" size={18} />
+              <p className="shrink-0 text-sm font-bold">
+                {t("outputSettings")}
+              </p>
+              {selectedEncoderLimitationText && (
+                <p
+                  className="ml-1 mt-0.5 min-w-0 flex-1 truncate text-[0.65rem] text-muted-foreground/80"
+                  title={selectedEncoderLimitationText}
+                >
+                  {selectedEncoderLimitationText}
+                </p>
+              )}
+            </div>
             <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_190px] gap-3">
               <EncoderTabs
                 capabilities={encoderCapabilities}

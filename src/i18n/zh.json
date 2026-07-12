@@ -29,7 +29,7 @@
   "noEncodersAvailable": "当前后端没有提供可用的输出编码器。",
   "encoderUnavailable": "当前后端构建不支持此格式",
   "limitationExifNotPreserved": "不保留 EXIF",
-  "limitationAnimatedInputRejected": "拒绝动画输入",
+  "limitationAnimatedInputRejected": "不支持动图输入",
   "limitationIccNotPreserved": "不保留 ICC 配置文件",
   "limitationMaximumDimension65535": "最大边长为 65535 像素",
   "limitationAvifInputDecodeUnavailable": "无法将 AVIF 作为输入解码",

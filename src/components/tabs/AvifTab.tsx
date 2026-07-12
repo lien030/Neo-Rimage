@@ -18,10 +18,8 @@ import TabCard from "./TabCard";
 
 export default function AvifTab({
   extensions,
-  limitations = [],
 }: {
   extensions: readonly string[];
-  limitations?: readonly string[];
 }) {
   const { t } = useTranslation();
   const config = useSnapshot(createTaskDraft).avif;
@@ -35,7 +33,6 @@ export default function AvifTab({
     <EncoderPanel
       description={t("avifDescription")}
       extensions={extensions}
-      limitations={limitations}
     >
       <TabCard
         title={t("quality")}

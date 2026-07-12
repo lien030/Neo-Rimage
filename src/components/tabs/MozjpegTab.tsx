@@ -36,10 +36,8 @@ const QUANTIZATION_TABLES: readonly {
 
 export default function MozjpegTab({
   extensions,
-  limitations = [],
 }: {
   extensions: readonly string[];
-  limitations?: readonly string[];
 }) {
   const { t } = useTranslation();
   const snap = useSnapshot(createTaskDraft);
@@ -54,7 +52,6 @@ export default function MozjpegTab({
     <EncoderPanel
       description={t("mozjpegDescription")}
       extensions={extensions}
-      limitations={limitations}
     >
       <TabCard
         title={t("quality")}

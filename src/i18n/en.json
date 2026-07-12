@@ -29,7 +29,7 @@
   "noEncodersAvailable": "This backend does not provide any usable output encoder.",
   "encoderUnavailable": "Unavailable in the current backend build",
   "limitationExifNotPreserved": "EXIF is not preserved",
-  "limitationAnimatedInputRejected": "Animated inputs are rejected",
+  "limitationAnimatedInputRejected": "Animated image input is not supported",
   "limitationIccNotPreserved": "ICC profiles are not preserved",
   "limitationMaximumDimension65535": "Maximum dimension is 65535 px",
   "limitationAvifInputDecodeUnavailable": "AVIF decoding of inputs is unavailable",

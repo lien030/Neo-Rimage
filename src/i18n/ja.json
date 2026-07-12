@@ -29,7 +29,7 @@
   "noEncodersAvailable": "現在のバックエンドには利用可能な出力エンコーダーがありません。",
   "encoderUnavailable": "現在のバックエンドビルドでは利用できません",
   "limitationExifNotPreserved": "EXIFは保持されません",
-  "limitationAnimatedInputRejected": "アニメーション入力は拒否されます",
+  "limitationAnimatedInputRejected": "アニメーション画像には対応していません",
   "limitationIccNotPreserved": "ICCプロファイルは保持されません",
   "limitationMaximumDimension65535": "最大辺は65535ピクセルです",
   "limitationAvifInputDecodeUnavailable": "AVIF入力のデコードは利用できません",

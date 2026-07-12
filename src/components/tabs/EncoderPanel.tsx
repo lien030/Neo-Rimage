@@ -2,24 +2,15 @@ import { Badge } from "@/components/ui/badge";
 import { Lightbulb, SlidersHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { describeEncoderLimitation } from "./encoder-limitations";
-
 export function EncoderPanel({
   description,
   extensions,
-  limitations = [],
   children,
 }: {
   description: string;
   extensions: readonly string[];
-  limitations?: readonly string[];
   children: React.ReactNode;
 }) {
-  const { t } = useTranslation();
-  const limitationLabels = limitations.map((code) =>
-    describeEncoderLimitation(code, t),
-  );
-
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-1">
       <div className="mx-2 flex h-5 min-w-0 items-center gap-1">
@@ -43,14 +34,6 @@ export function EncoderPanel({
           </Badge>
         ))}
       </div>
-      {limitationLabels.length > 0 && (
-        <p
-          className="mx-2 truncate text-[0.65rem] text-muted-foreground/80"
-          title={limitationLabels.join(" · ")}
-        >
-          {limitationLabels.join(" · ")}
-        </p>
-      )}
       <div className="grid min-h-0 w-full flex-1 auto-rows-max grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] content-start gap-2 overflow-y-auto pr-1">
         {children}
       </div>
@@ -61,11 +44,9 @@ export function EncoderPanel({
 export function OptionlessEncoderPanel({
   description,
   extensions,
-  limitations = [],
 }: {
   description: string;
   extensions: readonly string[];
-  limitations?: readonly string[];
 }) {
   const { t } = useTranslation();
 
@@ -73,7 +54,6 @@ export function OptionlessEncoderPanel({
     <EncoderPanel
       description={description}
       extensions={extensions}
-      limitations={limitations}
     >
       <div className="col-span-full flex min-h-28 w-full items-center justify-center rounded-lg border border-dashed px-6 text-center text-muted-foreground">
         <div className="flex max-w-sm flex-col items-center gap-2">
