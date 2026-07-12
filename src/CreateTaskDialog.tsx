@@ -286,7 +286,7 @@ function ResizeCard() {
           })
         }
       />
-      <div className="grid grid-cols-[1fr_100px] items-center gap-2 text-xs">
+      <div className="grid grid-cols-[minmax(0,1fr)_100px] items-center gap-2 text-xs">
         <span className="text-right">{t("filter")}</span>
         <Select
           value={resize.filter}
@@ -300,7 +300,7 @@ function ResizeCard() {
           <SelectTrigger className="h-7 min-w-0 px-2 text-xs">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent align="end" className="w-36 max-w-36">
             <SelectItem value="nearest">Nearest</SelectItem>
             <SelectItem value="bilinear">Bilinear</SelectItem>
             <SelectItem value="hamming">Hamming</SelectItem>
@@ -406,7 +406,7 @@ function OutputCard({
   return (
     <div className="flex min-w-0 flex-col gap-0.5 rounded-lg border px-3 py-1.5">
       <p className="text-sm font-bold">{t("output")}</p>
-      <div className="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)_max-content] gap-2">
+      <div className="grid min-w-0 grid-cols-[clamp(7rem,14vw,8rem)_minmax(0,1fr)_max-content] gap-2">
         <Select
           value={output.locationMode}
           disabled={isSubmitting}
@@ -420,7 +420,7 @@ function OutputCard({
             }
           }}
         >
-          <SelectTrigger className="h-7 min-w-0 max-w-full px-2 text-xs">
+          <SelectTrigger className="h-7 px-2 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
