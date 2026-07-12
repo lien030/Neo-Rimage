@@ -77,7 +77,7 @@ export default function AvifTab({
             })
           }
         >
-          <SelectTrigger className="my-1 h-6 px-1.5 text-[0.775rem]">
+          <SelectTrigger size="sm" className="my-1 px-1.5 text-[0.775rem]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -95,7 +95,7 @@ export default function AvifTab({
             })
           }
         >
-          <SelectTrigger className="my-1 h-6 px-1.5 text-[0.67rem]">
+          <SelectTrigger size="sm" className="my-1 px-1.5 text-[0.67rem]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

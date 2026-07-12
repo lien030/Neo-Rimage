@@ -126,7 +126,7 @@ export default function MozjpegTab({
             })
           }
         >
-          <SelectTrigger className="h-6 px-1.5 my-1 text-[0.775rem]">
+          <SelectTrigger size="sm" className="my-1 px-1.5 text-[0.775rem]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -160,7 +160,7 @@ export default function MozjpegTab({
             })
           }
         >
-          <SelectTrigger className="h-6 px-1.5 my-1 text-[0.7rem]">
+          <SelectTrigger size="sm" className="my-1 px-1.5 text-[0.7rem]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

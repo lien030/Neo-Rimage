@@ -45,7 +45,7 @@ export default function TabCard({
           min={variant === "number" ? min : undefined}
           max={variant === "number" ? max : undefined}
           disabled={disabled}
-          className="h-6 px-1.5 my-1 text-right"
+          className="my-1 h-7 px-1.5 text-right"
           onChange={(event) => onValueChange?.(event.target.value)}
         />
       )}

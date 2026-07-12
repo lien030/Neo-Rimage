@@ -297,7 +297,7 @@ function ResizeCard() {
             })
           }
         >
-          <SelectTrigger className="h-7 min-w-0 px-2 text-xs">
+          <SelectTrigger size="sm" className="min-w-0 px-2 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end" className="w-36 max-w-36">
@@ -420,7 +420,7 @@ function OutputCard({
             }
           }}
         >
-          <SelectTrigger className="h-7 px-2 text-xs">
+          <SelectTrigger size="sm" className="px-2 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -485,7 +485,7 @@ function OutputCard({
               })
             }
           >
-            <SelectTrigger className="h-7 px-2 text-xs">
+            <SelectTrigger size="sm" className="px-2 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
