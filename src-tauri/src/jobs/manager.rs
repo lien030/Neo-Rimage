@@ -1,6 +1,4 @@
-use std::any::Any;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, SyncSender, TrySendError};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, TryLockError};
@@ -8,18 +6,22 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::domain::{
-    AppError, BackendSnapshot, EngineProgressEvent, EngineResult, EngineWarning, ErrorCategory,
-    ErrorContext, ItemControlAvailability, ItemId, ItemProgress, ItemResultSummary, ItemSnapshot,
-    ItemSpec, ItemStatus, JobControlAvailability, JobCounts, JobDetailSnapshot, JobId,
-    JobProgressSnapshot, JobSnapshot, JobSpec, JobStatus, Page, ProcessingStage, ProgressMeasure,
-    ResultSummary, Revision, SchedulerMode, SchedulerSnapshot, TimestampMs, WorkerSlotId,
-    WorkerSlotSnapshot, WorkerSlotStatus, IPC_SCHEMA_VERSION,
+    AppError, BackendSnapshot, EngineProgressEvent, EngineResult, EngineWarning, ItemId,
+    ItemProgress, ItemSpec, ItemStatus, JobCounts, JobDetailSnapshot, JobId, JobSnapshot, JobSpec,
+    JobStatus, Page, ProcessingStage, ProgressMeasure, Revision, TimestampMs, WorkerSlotId,
+    IPC_SCHEMA_VERSION,
 };
 
 use super::{
     CancellationToken, ClearResult, ExecutionContext, ExecutionOutcome, ExecutionTask, Executor,
     JobSubmission, ManagerError, ProgressReporter, RetryMode, RevisionSubscription, ShutdownReport,
 };
+
+mod completion;
+mod projection;
+
+use completion::{apply_finished_outcome, panic_message};
+use projection::{snapshot_item, snapshot_job, snapshot_state};
 
 pub trait Clock: Send + Sync + 'static {
     fn now_ms(&self) -> TimestampMs;
@@ -422,33 +424,7 @@ impl JobManager {
             return Ok(());
         }
 
-        if matches!(job.status, JobStatus::Running | JobStatus::Paused) {
-            transition_job(job, JobStatus::Cancelling);
-        }
-        job.cancel_requested = true;
-        job.paused = false;
-        for item in &mut job.items {
-            match item.status {
-                ItemStatus::Queued => {
-                    transition_item(item, ItemStatus::Cancelled);
-                    item.finished_at = Some(now);
-                }
-                ItemStatus::Running => {
-                    transition_item(item, ItemStatus::Cancelling);
-                    if let Some(token) = &item.cancellation {
-                        token.cancel();
-                    }
-                }
-                ItemStatus::Cancelling
-                | ItemStatus::Succeeded
-                | ItemStatus::Failed
-                | ItemStatus::Cancelled
-                | ItemStatus::Skipped => {}
-            }
-        }
-        let next_status = derive_job_status(job);
-        transition_job(job, next_status);
-        job.updated_at = now;
+        request_job_cancellation(job, now);
         let terminal = job.status.is_terminal();
         bump_revision(&mut state);
         drop(state);
@@ -462,11 +438,7 @@ impl JobManager {
     pub fn cancel_item(&self, item_id: &ItemId) -> Result<(), ManagerError> {
         let now = self.shared.clock.now_ms();
         let mut state = lock_state(&self.shared.state);
-        let job_id = state
-            .jobs
-            .iter()
-            .find(|(_, job)| job.items.iter().any(|item| &item.spec.id == item_id))
-            .map(|(job_id, _)| job_id.clone())
+        let job_id = job_id_for_item(&state, item_id)
             .ok_or_else(|| ManagerError::ItemNotFound(item_id.clone()))?;
         let job = state
             .jobs
@@ -532,13 +504,10 @@ impl JobManager {
             return Err(invalid_action(job, "retry"));
         }
 
+        let include_cancelled = mode == RetryMode::FailedAndCancelled;
         let mut retried = 0;
         for item in &mut job.items {
-            let retry_failed = item.status == ItemStatus::Failed
-                && item.error.as_ref().is_some_and(|error| error.retryable);
-            let retry_cancelled =
-                mode == RetryMode::FailedAndCancelled && item.status == ItemStatus::Cancelled;
-            if !retry_failed && !retry_cancelled {
+            if !item_is_retryable(item, include_cancelled) {
                 continue;
             }
             reset_item_for_retry(item);
@@ -574,11 +543,7 @@ impl JobManager {
         if state.shutting_down {
             return Err(ManagerError::ShuttingDown);
         }
-        let job_id = state
-            .jobs
-            .iter()
-            .find(|(_, job)| job.items.iter().any(|item| &item.spec.id == item_id))
-            .map(|(job_id, _)| job_id.clone())
+        let job_id = job_id_for_item(&state, item_id)
             .ok_or_else(|| ManagerError::ItemNotFound(item_id.clone()))?;
         let job = state
             .jobs
@@ -596,10 +561,7 @@ impl JobManager {
             .iter_mut()
             .find(|item| &item.spec.id == item_id)
             .ok_or_else(|| ManagerError::ItemNotFound(item_id.clone()))?;
-        let retryable = item.status == ItemStatus::Cancelled
-            || (item.status == ItemStatus::Failed
-                && item.error.as_ref().is_some_and(|error| error.retryable));
-        if !retryable {
+        if !item_is_retryable(item, true) {
             return Err(ManagerError::InvalidItemAction {
                 item_id: item_id.clone(),
                 state: item.status,
@@ -704,33 +666,7 @@ impl JobManager {
                 if job.status.is_terminal() {
                     continue;
                 }
-                if matches!(job.status, JobStatus::Running | JobStatus::Paused) {
-                    transition_job(job, JobStatus::Cancelling);
-                }
-                job.cancel_requested = true;
-                job.paused = false;
-                for item in &mut job.items {
-                    match item.status {
-                        ItemStatus::Queued => {
-                            transition_item(item, ItemStatus::Cancelled);
-                            item.finished_at = Some(now);
-                        }
-                        ItemStatus::Running => {
-                            transition_item(item, ItemStatus::Cancelling);
-                            if let Some(token) = &item.cancellation {
-                                token.cancel();
-                            }
-                        }
-                        ItemStatus::Cancelling
-                        | ItemStatus::Succeeded
-                        | ItemStatus::Failed
-                        | ItemStatus::Cancelled
-                        | ItemStatus::Skipped => {}
-                    }
-                }
-                let next_status = derive_job_status(job);
-                transition_job(job, next_status);
-                job.updated_at = now;
+                request_job_cancellation(job, now);
             }
             state.runnable_jobs.clear();
             bump_revision(&mut state);
@@ -801,6 +737,11 @@ fn bump_revision(state: &mut State) {
     state.revision = Revision(state.revision.0.saturating_add(1));
 }
 
+/// Wake observers after a mutation whose state lock has already been released.
+///
+/// Re-reading the revision is intentional: a concurrent mutation may move the
+/// notification forward, but it can never make this snapshot-dirty hint stale.
+/// Revision subscriptions are coalesced wake-ups rather than an event log.
 fn announce_current_revision(shared: &Shared) {
     let revision = lock_state(&shared.state).revision;
     notify_revision(shared, revision);
@@ -839,6 +780,53 @@ fn transition_job(job: &mut JobRecord, next: JobStatus) {
     }
 }
 
+fn job_id_for_item(state: &State, item_id: &ItemId) -> Option<JobId> {
+    state.jobs.iter().find_map(|(job_id, job)| {
+        job.items
+            .iter()
+            .any(|item| &item.spec.id == item_id)
+            .then(|| job_id.clone())
+    })
+}
+
+/// Cancel queued work immediately and signal running work cooperatively.
+///
+/// Running items retain their worker slot until the executor reaches a safe
+/// cancellation boundary and reports completion. This invariant keeps the
+/// configured concurrency budget accurate during cancellation and shutdown.
+fn request_job_cancellation(job: &mut JobRecord, now: TimestampMs) {
+    debug_assert!(!job.status.is_terminal());
+    if matches!(job.status, JobStatus::Running | JobStatus::Paused) {
+        transition_job(job, JobStatus::Cancelling);
+    }
+    job.cancel_requested = true;
+    job.paused = false;
+
+    for item in &mut job.items {
+        match item.status {
+            ItemStatus::Queued => {
+                transition_item(item, ItemStatus::Cancelled);
+                item.finished_at = Some(now);
+            }
+            ItemStatus::Running => {
+                transition_item(item, ItemStatus::Cancelling);
+                if let Some(token) = &item.cancellation {
+                    token.cancel();
+                }
+            }
+            ItemStatus::Cancelling
+            | ItemStatus::Succeeded
+            | ItemStatus::Failed
+            | ItemStatus::Cancelled
+            | ItemStatus::Skipped => {}
+        }
+    }
+
+    let next_status = derive_job_status(job);
+    transition_job(job, next_status);
+    job.updated_at = now;
+}
+
 fn reset_item_for_retry(item: &mut ItemRecord) {
     item.attempt = item.attempt.saturating_add(1);
     item.status = ItemStatus::Queued;
@@ -851,6 +839,12 @@ fn reset_item_for_retry(item: &mut ItemRecord) {
     item.finished_at = None;
     item.result = None;
     item.error = None;
+}
+
+fn item_is_retryable(item: &ItemRecord, include_cancelled: bool) -> bool {
+    (include_cancelled && item.status == ItemStatus::Cancelled)
+        || (item.status == ItemStatus::Failed
+            && item.error.as_ref().is_some_and(|error| error.retryable))
 }
 
 fn active_items(state: &State) -> usize {
@@ -920,167 +914,6 @@ fn count_items(items: &[ItemRecord]) -> JobCounts {
         }
     }
     counts
-}
-
-fn snapshot_state(state: &State, generated_at: TimestampMs) -> BackendSnapshot {
-    let jobs = state
-        .job_order
-        .iter()
-        .filter_map(|job_id| state.jobs.get(job_id))
-        .map(|job| snapshot_job(job, state.revision))
-        .collect();
-    let worker_slots = state
-        .slots
-        .iter()
-        .enumerate()
-        .filter(|(index, slot)| *index < state.desired_concurrency || slot.item_id.is_some())
-        .map(|(index, slot)| snapshot_slot(state, index, slot))
-        .collect();
-
-    BackendSnapshot {
-        schema_version: IPC_SCHEMA_VERSION,
-        revision: state.revision,
-        generated_at,
-        scheduler: SchedulerSnapshot {
-            mode: if state.shutting_down {
-                SchedulerMode::ShuttingDown
-            } else if state.scheduler_paused {
-                SchedulerMode::Paused
-            } else {
-                SchedulerMode::Running
-            },
-            desired_concurrency: u16_len(state.desired_concurrency),
-            effective_concurrency: if state.shutting_down {
-                0
-            } else {
-                u16_len(state.desired_concurrency)
-            },
-            max_concurrency: u16_len(state.maximum_concurrency),
-            active_items: u32_len(active_items(state)),
-            queued_items: u32_len(queued_items(state)),
-        },
-        worker_slots,
-        jobs,
-    }
-}
-
-fn snapshot_slot(state: &State, index: usize, slot: &SlotRecord) -> WorkerSlotSnapshot {
-    let item = slot.item_id.as_ref().and_then(|item_id| {
-        state
-            .jobs
-            .values()
-            .flat_map(|job| &job.items)
-            .find(|item| &item.spec.id == item_id)
-    });
-    WorkerSlotSnapshot {
-        id: slot.id.clone(),
-        status: match (&slot.item_id, index < state.desired_concurrency) {
-            (Some(_), false) => WorkerSlotStatus::Draining,
-            (Some(_), true) => WorkerSlotStatus::Busy,
-            (None, _) => WorkerSlotStatus::Idle,
-        },
-        item_id: slot.item_id.clone(),
-        input_path: item.map(|item| path_text(&item.spec.input_path)),
-        stage: item.and_then(|item| item.stage),
-        progress: item.and_then(|item| item.progress.clone()),
-    }
-}
-
-fn snapshot_job(job: &JobRecord, revision: Revision) -> JobSnapshot {
-    let counts = count_items(&job.items);
-    JobSnapshot {
-        id: job.spec.id.clone(),
-        revision,
-        config_version: job.spec.config_version,
-        encoder: job.spec.encoder.kind(),
-        status: job.status,
-        created_at: job.spec.created_at,
-        updated_at: job.updated_at,
-        progress: JobProgressSnapshot {
-            completed_items: counts.terminal(),
-            total_items: counts.total,
-            active_items: counts.running.saturating_add(counts.cancelling),
-        },
-        controls: job_controls(job),
-        result: job.status.is_terminal().then(|| aggregate_result(job)),
-        error: None,
-        counts,
-    }
-}
-
-fn snapshot_item(item: &ItemRecord, revision: Revision) -> ItemSnapshot {
-    ItemSnapshot {
-        id: item.spec.id.clone(),
-        job_id: item.spec.job_id.clone(),
-        revision,
-        sequence: item.spec.sequence,
-        attempt: item.attempt,
-        input_path: path_text(&item.spec.input_path),
-        output_path: Some(path_text(&item.spec.output.output_path)),
-        status: item.status,
-        stage: item.stage,
-        progress: item.progress.clone(),
-        worker_slot_id: item.slot_id.clone(),
-        created_at: item.created_at,
-        started_at: item.started_at,
-        finished_at: item.finished_at,
-        controls: ItemControlAvailability {
-            can_cancel: matches!(item.status, ItemStatus::Queued | ItemStatus::Running),
-            can_retry: item.status == ItemStatus::Cancelled
-                || (item.status == ItemStatus::Failed
-                    && item.error.as_ref().is_some_and(|error| error.retryable)),
-        },
-        result: item.result.as_ref().map(|result| ItemResultSummary {
-            output_path: path_text(&result.output_path),
-            input_bytes: result.input_bytes,
-            output_bytes: result.output_bytes,
-            duration_ms: result.duration_ms,
-        }),
-        error: item.error.clone(),
-        warnings: item.warnings.clone(),
-    }
-}
-
-fn job_controls(job: &JobRecord) -> JobControlAvailability {
-    let can_retry = job.items.iter().any(|item| {
-        item.status == ItemStatus::Cancelled
-            || (item.status == ItemStatus::Failed
-                && item.error.as_ref().is_some_and(|error| error.retryable))
-    });
-    JobControlAvailability {
-        can_pause: job.status == JobStatus::Running,
-        can_resume: job.status == JobStatus::Paused,
-        can_cancel: !job.status.is_terminal() && job.status != JobStatus::Cancelling,
-        can_retry: job.status.is_terminal() && can_retry,
-        can_remove: job.status.is_terminal(),
-    }
-}
-
-fn aggregate_result(job: &JobRecord) -> ResultSummary {
-    let counts = count_items(&job.items);
-    let mut result = ResultSummary {
-        succeeded: counts.succeeded,
-        failed: counts.failed,
-        cancelled: counts.cancelled,
-        skipped: counts.skipped,
-        ..ResultSummary::default()
-    };
-    for item in &job.items {
-        if let Some(item_result) = &item.result {
-            result.total_input_bytes = result
-                .total_input_bytes
-                .saturating_add(item_result.input_bytes);
-            result.total_output_bytes = result
-                .total_output_bytes
-                .saturating_add(item_result.output_bytes);
-        }
-    }
-    result.duration_ms = job.updated_at.0.saturating_sub(job.spec.created_at.0);
-    result
-}
-
-fn path_text(path: &Path) -> String {
-    path.to_string_lossy().into_owned()
 }
 
 fn u16_len(value: usize) -> u16 {
@@ -1194,6 +1027,9 @@ fn prepare_next_work(state: &mut State, now: TimestampMs) -> Option<DispatchWork
     Some(DispatchWork { task, cancellation })
 }
 
+// This value is produced and consumed once on the same worker path. Keeping the
+// domain outcome inline avoids a heap allocation for every completed image.
+#[allow(clippy::large_enum_variant)]
 enum FinishedOutcome {
     Engine(ExecutionOutcome),
     Panicked(String),
@@ -1221,6 +1057,9 @@ fn execute_work(shared: Arc<Shared>, work: DispatchWork) {
 
 fn record_progress(shared: &Shared, item_id: &ItemId, event: EngineProgressEvent) {
     let now = shared.clock.now_ms();
+    // Fractional progress can arrive much faster than commands and snapshots.
+    // It is deliberately lossy under contention; stage boundaries and warnings
+    // still take the blocking path, so meaningful lifecycle updates are kept.
     let mut state = if matches!(&event, EngineProgressEvent::StageProgress { .. }) {
         match shared.state.try_lock() {
             Ok(state) => state,
@@ -1230,11 +1069,10 @@ fn record_progress(shared: &Shared, item_id: &ItemId, event: EngineProgressEvent
     } else {
         lock_state(&shared.state)
     };
-    let Some(job) = state
-        .jobs
-        .values_mut()
-        .find(|job| job.items.iter().any(|item| &item.spec.id == item_id))
-    else {
+    let Some(job_id) = job_id_for_item(&state, item_id) else {
+        return;
+    };
+    let Some(job) = state.jobs.get_mut(&job_id) else {
         return;
     };
     let Some(item) = job.items.iter_mut().find(|item| &item.spec.id == item_id) else {
@@ -1294,12 +1132,7 @@ fn finish_work(shared: Arc<Shared>, item_id: ItemId, outcome: FinishedOutcome, r
     let now = shared.clock.now_ms();
     {
         let mut state = lock_state(&shared.state);
-        let Some(job_id) = state
-            .jobs
-            .iter()
-            .find(|(_, job)| job.items.iter().any(|item| item.spec.id == item_id))
-            .map(|(job_id, _)| job_id.clone())
-        else {
+        let Some(job_id) = job_id_for_item(&state, &item_id) else {
             return;
         };
 
@@ -1317,89 +1150,7 @@ fn finish_work(shared: Arc<Shared>, item_id: ItemId, outcome: FinishedOutcome, r
             let slot_id = item.slot_id.take();
             item.cancellation = None;
             item.finished_at = Some(now);
-            match outcome {
-                FinishedOutcome::Engine(ExecutionOutcome::Succeeded(result)) => {
-                    if result.job_id == job_id
-                        && result.item_id == item_id
-                        && result.attempt == item.attempt
-                    {
-                        transition_item(item, ItemStatus::Succeeded);
-                        item.stage = Some(ProcessingStage::Complete);
-                        for warning in &result.warnings {
-                            if !item.warnings.contains(warning) {
-                                item.warnings.push(warning.clone());
-                            }
-                        }
-                        item.result = Some(result);
-                        item.error = None;
-                    } else {
-                        transition_item(item, ItemStatus::Failed);
-                        item.result = None;
-                        item.error = Some(internal_executor_error(
-                            "executor.result_identity_mismatch",
-                            "errors.executorResultIdentityMismatch",
-                            "executor result identity did not match the dispatched item".to_owned(),
-                            &job_id,
-                            &item_id,
-                            item.stage,
-                        ));
-                    }
-                }
-                FinishedOutcome::Engine(ExecutionOutcome::Failed(mut error)) => {
-                    transition_item(item, ItemStatus::Failed);
-                    fill_error_context(&mut error, &job_id, &item_id, item.stage);
-                    item.result = None;
-                    item.error = Some(error);
-                }
-                FinishedOutcome::Engine(ExecutionOutcome::Cancelled) => {
-                    if cancel_requested || item.status == ItemStatus::Cancelling {
-                        transition_item(item, ItemStatus::Cancelled);
-                        item.result = None;
-                        item.error = None;
-                    } else {
-                        transition_item(item, ItemStatus::Failed);
-                        item.result = None;
-                        item.error = Some(internal_executor_error(
-                            "executor.unexpected_cancelled",
-                            "errors.executorUnexpectedCancelled",
-                            "executor returned cancelled without a manager cancellation request"
-                                .to_owned(),
-                            &job_id,
-                            &item_id,
-                            item.stage,
-                        ));
-                    }
-                }
-                FinishedOutcome::Engine(ExecutionOutcome::Skipped) => {
-                    transition_item(item, ItemStatus::Skipped);
-                    item.result = None;
-                    item.error = None;
-                }
-                FinishedOutcome::Panicked(message) => {
-                    transition_item(item, ItemStatus::Failed);
-                    item.result = None;
-                    item.error = Some(internal_executor_error(
-                        "executor.panicked",
-                        "errors.executorPanicked",
-                        message,
-                        &job_id,
-                        &item_id,
-                        item.stage,
-                    ));
-                }
-                FinishedOutcome::Unavailable(message) => {
-                    transition_item(item, ItemStatus::Failed);
-                    item.result = None;
-                    item.error = Some(internal_executor_error(
-                        "executor.unavailable",
-                        "errors.executorUnavailable",
-                        message,
-                        &job_id,
-                        &item_id,
-                        item.stage,
-                    ));
-                }
-            }
+            apply_finished_outcome(item, outcome, cancel_requested, &job_id, &item_id);
             let next_status = derive_job_status(job);
             transition_job(job, next_status);
             job.updated_at = now;
@@ -1417,50 +1168,5 @@ fn finish_work(shared: Arc<Shared>, item_id: ItemId, outcome: FinishedOutcome, r
     announce_current_revision(&shared);
     if reschedule {
         dispatch(shared);
-    }
-}
-
-fn fill_error_context(
-    error: &mut AppError,
-    job_id: &JobId,
-    item_id: &ItemId,
-    stage: Option<ProcessingStage>,
-) {
-    if error.context.job_id.is_none() {
-        error.context.job_id = Some(job_id.clone());
-    }
-    if error.context.item_id.is_none() {
-        error.context.item_id = Some(item_id.clone());
-    }
-    if error.context.stage.is_none() {
-        error.context.stage = stage;
-    }
-}
-
-fn internal_executor_error(
-    code: &'static str,
-    message_key: &'static str,
-    fallback_message: String,
-    job_id: &JobId,
-    item_id: &ItemId,
-    stage: Option<ProcessingStage>,
-) -> AppError {
-    AppError::new(code, ErrorCategory::Internal, message_key, fallback_message).with_context(
-        ErrorContext {
-            job_id: Some(job_id.clone()),
-            item_id: Some(item_id.clone()),
-            stage,
-            path: None,
-        },
-    )
-}
-
-fn panic_message(payload: Box<dyn Any + Send>) -> String {
-    if let Some(message) = payload.downcast_ref::<&str>() {
-        (*message).to_owned()
-    } else if let Some(message) = payload.downcast_ref::<String>() {
-        message.clone()
-    } else {
-        "executor panicked with a non-string payload".to_owned()
     }
 }
