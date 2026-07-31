@@ -360,6 +360,41 @@ fn output_planning_never_overwrites_another_input_in_the_job() {
 }
 
 #[test]
+fn output_root_parent_segments_are_normalized_before_collision_checks() {
+    let directory = TestDirectory::new("output-root-parent-segments");
+    let input_root = directory.path("input");
+    fs::create_dir_all(&input_root).expect("create input directory");
+    let input = input_root.join("photo.png");
+    fs::write(&input, b"fixture").expect("write input");
+
+    // The missing component makes the raw spelling non-existent, but the
+    // normalized destination is still the input directory.
+    let output_root = input_root.join("future").join("..");
+    let mut request = request(
+        vec![InputResource {
+            path: input.to_string_lossy().into_owned(),
+            kind: InputResourceKind::File,
+            scan_recursively: false,
+        }],
+        OutputPolicy {
+            location: OutputLocation::Directory(output_root.to_string_lossy().into_owned()),
+            preserve_structure: false,
+            suffix: String::new(),
+            collision: CollisionPolicy::Fail,
+            source_backup: BackupPolicy::Disabled,
+            existing_output_backup: BackupPolicy::Disabled,
+        },
+    );
+    request.encoder = EncoderConfig::Png;
+
+    let error = RequestNormalizer::default()
+        .normalize(request)
+        .expect_err("lexically equivalent output must be treated as in-place");
+
+    assert_eq!(error.code.0, "output.in_place_requires_replace");
+}
+
+#[test]
 fn in_place_replace_derives_a_separate_source_backup() {
     let directory = TestDirectory::new("source-backup");
     let input = directory.path("photo.jpg");

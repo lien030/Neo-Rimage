@@ -149,6 +149,110 @@ struct DiscoveryResult {
     had_supported_file: bool,
 }
 
+/// Tracks every filesystem identity claimed by one job while its output plan
+/// is built. Keeping the three namespaces together makes it harder to add a
+/// new output/backup path without checking it against the other two.
+struct OutputReservations {
+    inputs: HashSet<PathIdentity>,
+    outputs: HashSet<PathIdentity>,
+    backups: HashSet<PathIdentity>,
+}
+
+impl OutputReservations {
+    fn new(candidates: &[InputCandidate]) -> Self {
+        Self {
+            inputs: candidates
+                .iter()
+                .map(|candidate| path_identity(&candidate.path))
+                .collect(),
+            outputs: HashSet::new(),
+            backups: HashSet::new(),
+        }
+    }
+
+    fn reserve_output(
+        &mut self,
+        initial: PathBuf,
+        collision: CollisionPolicy,
+        current_input: &Path,
+    ) -> Result<PathBuf, AppError> {
+        if collision == CollisionPolicy::AutoRename {
+            for index in 0..10_000u32 {
+                let candidate = if index == 0 {
+                    initial.clone()
+                } else {
+                    numbered_path(&initial, index)?
+                };
+                let key = path_identity(&candidate);
+                if !candidate.exists()
+                    && !self.outputs.contains(&key)
+                    && !self.backups.contains(&key)
+                    && (!self.inputs.contains(&key) || paths_equal(&candidate, current_input))
+                {
+                    self.outputs.insert(key);
+                    return Ok(candidate);
+                }
+            }
+            return Err(output_error(
+                "output.auto_rename_exhausted",
+                "errors.outputNameUnavailable",
+                "A unique output name could not be reserved.",
+                &initial,
+                true,
+            ));
+        }
+
+        let key = path_identity(&initial);
+        if self.outputs.contains(&key) || self.backups.contains(&key) {
+            return Err(output_error(
+                "output.job_collision",
+                "errors.outputCollision",
+                "Multiple inputs in this job resolve to the same output path.",
+                &initial,
+                false,
+            ));
+        }
+        if self.inputs.contains(&key) && !paths_equal(&initial, current_input) {
+            return Err(output_error(
+                "output.overwrites_other_input",
+                "errors.outputOverwritesInput",
+                "An output path would overwrite another input in the same job.",
+                &initial,
+                false,
+            ));
+        }
+        if collision == CollisionPolicy::Fail && initial.exists() {
+            return Err(output_error(
+                "output.already_exists",
+                "errors.outputAlreadyExists",
+                "The output file already exists.",
+                &initial,
+                false,
+            ));
+        }
+        self.outputs.insert(key);
+        Ok(initial)
+    }
+
+    fn reserve_backup(&mut self, path: PathBuf) -> Result<PathBuf, AppError> {
+        let key = path_identity(&path);
+        if path.exists()
+            || self.outputs.contains(&key)
+            || self.inputs.contains(&key)
+            || !self.backups.insert(key)
+        {
+            return Err(output_error(
+                "output.backup_collision",
+                "errors.backupAlreadyExists",
+                "The planned backup path already exists or conflicts with another backup.",
+                &path,
+                false,
+            ));
+        }
+        Ok(path)
+    }
+}
+
 fn validate_request_shape(request: &CreateJobRequest) -> Result<(), AppError> {
     if request.schema_version != IPC_SCHEMA_VERSION {
         return Err(AppError::new(
@@ -190,13 +294,7 @@ fn validate_request_shape(request: &CreateJobRequest) -> Result<(), AppError> {
         }
         let path = Path::new(path);
         if path.exists() && !path.is_dir() {
-            return Err(output_error(
-                "output.directory_not_directory",
-                "errors.outputDirectoryInvalid",
-                "The selected output location is not a directory.",
-                path,
-                false,
-            ));
+            return Err(output_directory_not_directory(path));
         }
     }
     Ok(())
@@ -372,93 +470,86 @@ fn plan_items(
         OutputLocation::SameDirectory => None,
         OutputLocation::Directory(path) => Some(normalize_output_root(Path::new(path))?),
     };
-    let mut reserved_outputs = HashSet::new();
-    let mut reserved_backups = HashSet::new();
-    let input_paths = candidates
-        .iter()
-        .map(|candidate| path_identity(&candidate.path))
-        .collect::<HashSet<_>>();
-    let mut items = Vec::with_capacity(candidates.len());
+    let mut reservations = OutputReservations::new(&candidates);
+    candidates
+        .into_iter()
+        .enumerate()
+        .map(|(sequence, candidate)| {
+            plan_item(
+                request,
+                candidate,
+                output_root.as_deref(),
+                sequence,
+                &mut reservations,
+            )
+        })
+        .collect()
+}
 
-    for (sequence, candidate) in candidates.into_iter().enumerate() {
-        let mut output_path = output_path_for(
-            &candidate,
-            output_root.as_deref(),
-            request.output.preserve_structure,
-            &request.output.suffix,
-            encoder_output_extension(&request.encoder),
-        )?;
-        if paths_equal(&candidate.path, &output_path)
-            && request.output.collision == CollisionPolicy::Fail
-        {
-            return Err(output_error(
-                "output.in_place_requires_replace",
-                "errors.inPlaceRequiresReplace",
-                "In-place output requires the replace collision policy.",
-                &output_path,
-                false,
-            ));
-        }
-        output_path = reserve_output_path(
-            output_path,
-            request.output.collision,
-            &mut reserved_outputs,
-            &reserved_backups,
-            &input_paths,
-            &candidate.path,
-        )?;
-        let in_place = paths_equal(&candidate.path, &output_path);
-        if in_place && request.output.collision != CollisionPolicy::Replace {
-            return Err(output_error(
-                "output.in_place_requires_replace",
-                "errors.inPlaceRequiresReplace",
-                "In-place output requires the replace collision policy.",
-                &output_path,
-                false,
-            ));
-        }
-
-        let source_backup_path =
-            if in_place && request.output.source_backup == BackupPolicy::Enabled {
-                Some(reserve_backup_path(
-                    backup_path_for(&candidate.path, "source-backup")?,
-                    &mut reserved_backups,
-                    &reserved_outputs,
-                    &input_paths,
-                )?)
-            } else {
-                None
-            };
-        let existing_output_backup_path = if !in_place
-            && request.output.collision == CollisionPolicy::Replace
-            && request.output.existing_output_backup == BackupPolicy::Enabled
-        {
-            Some(reserve_backup_path(
-                backup_path_for(&output_path, "output-backup")?,
-                &mut reserved_backups,
-                &reserved_outputs,
-                &input_paths,
-            )?)
-        } else {
-            None
-        };
-
-        items.push(ItemSpec {
-            id: ItemId::default(),
-            job_id: JobId::default(),
-            sequence: u32::try_from(sequence).unwrap_or(u32::MAX),
-            attempt: 1,
-            input_path: candidate.path,
-            scan_root: candidate.scan_root,
-            output: OutputPlan {
-                output_path,
-                collision: request.output.collision,
-                source_backup_path,
-                existing_output_backup_path,
-            },
-        });
+fn plan_item(
+    request: &CreateJobRequest,
+    candidate: InputCandidate,
+    output_root: Option<&Path>,
+    sequence: usize,
+    reservations: &mut OutputReservations,
+) -> Result<ItemSpec, AppError> {
+    let mut output_path = output_path_for(
+        &candidate,
+        output_root,
+        request.output.preserve_structure,
+        &request.output.suffix,
+        encoder_output_extension(&request.encoder),
+    )?;
+    let initially_in_place = paths_equal(&candidate.path, &output_path);
+    if initially_in_place && request.output.collision == CollisionPolicy::Fail {
+        return Err(in_place_output_error(&output_path));
     }
-    Ok(items)
+
+    output_path =
+        reservations.reserve_output(output_path, request.output.collision, &candidate.path)?;
+    let in_place = paths_equal(&candidate.path, &output_path);
+    if in_place && request.output.collision != CollisionPolicy::Replace {
+        return Err(in_place_output_error(&output_path));
+    }
+
+    let source_backup_path = if in_place && request.output.source_backup == BackupPolicy::Enabled {
+        Some(reservations.reserve_backup(backup_path_for(&candidate.path, "source-backup")?)?)
+    } else {
+        None
+    };
+    let existing_output_backup_path = if !in_place
+        && request.output.collision == CollisionPolicy::Replace
+        && request.output.existing_output_backup == BackupPolicy::Enabled
+    {
+        Some(reservations.reserve_backup(backup_path_for(&output_path, "output-backup")?)?)
+    } else {
+        None
+    };
+
+    Ok(ItemSpec {
+        id: ItemId::default(),
+        job_id: JobId::default(),
+        sequence: u32::try_from(sequence).unwrap_or(u32::MAX),
+        attempt: 1,
+        input_path: candidate.path,
+        scan_root: candidate.scan_root,
+        output: OutputPlan {
+            output_path,
+            collision: request.output.collision,
+            source_backup_path,
+            existing_output_backup_path,
+        },
+    })
+}
+
+fn in_place_output_error(path: &Path) -> AppError {
+    output_error(
+        "output.in_place_requires_replace",
+        "errors.inPlaceRequiresReplace",
+        "In-place output requires the replace collision policy.",
+        path,
+        false,
+    )
 }
 
 fn output_path_for(
@@ -501,95 +592,6 @@ fn output_path_for(
     Ok(output)
 }
 
-fn reserve_output_path(
-    initial: PathBuf,
-    collision: CollisionPolicy,
-    reserved: &mut HashSet<PathIdentity>,
-    reserved_backups: &HashSet<PathIdentity>,
-    input_paths: &HashSet<PathIdentity>,
-    current_input: &Path,
-) -> Result<PathBuf, AppError> {
-    if collision == CollisionPolicy::AutoRename {
-        for index in 0..10_000u32 {
-            let candidate = if index == 0 {
-                initial.clone()
-            } else {
-                numbered_path(&initial, index)?
-            };
-            let key = path_identity(&candidate);
-            if !candidate.exists()
-                && !reserved.contains(&key)
-                && !reserved_backups.contains(&key)
-                && (!input_paths.contains(&key) || paths_equal(&candidate, current_input))
-            {
-                reserved.insert(key);
-                return Ok(candidate);
-            }
-        }
-        return Err(output_error(
-            "output.auto_rename_exhausted",
-            "errors.outputNameUnavailable",
-            "A unique output name could not be reserved.",
-            &initial,
-            true,
-        ));
-    }
-
-    let key = path_identity(&initial);
-    if reserved.contains(&key) || reserved_backups.contains(&key) {
-        return Err(output_error(
-            "output.job_collision",
-            "errors.outputCollision",
-            "Multiple inputs in this job resolve to the same output path.",
-            &initial,
-            false,
-        ));
-    }
-    if input_paths.contains(&key) && !paths_equal(&initial, current_input) {
-        return Err(output_error(
-            "output.overwrites_other_input",
-            "errors.outputOverwritesInput",
-            "An output path would overwrite another input in the same job.",
-            &initial,
-            false,
-        ));
-    }
-    if collision == CollisionPolicy::Fail && initial.exists() {
-        return Err(output_error(
-            "output.already_exists",
-            "errors.outputAlreadyExists",
-            "The output file already exists.",
-            &initial,
-            false,
-        ));
-    }
-    reserved.insert(key);
-    Ok(initial)
-}
-
-fn reserve_backup_path(
-    path: PathBuf,
-    reserved: &mut HashSet<PathIdentity>,
-    reserved_outputs: &HashSet<PathIdentity>,
-    input_paths: &HashSet<PathIdentity>,
-) -> Result<PathBuf, AppError> {
-    let key = path_identity(&path);
-    if path.exists()
-        || reserved_outputs.contains(&key)
-        || input_paths.contains(&key)
-        || !reserved.insert(key)
-    {
-        return Err(output_error(
-            "output.backup_collision",
-            "errors.backupAlreadyExists",
-            "The planned backup path already exists or conflicts with another backup.",
-            &path,
-            false,
-        ));
-    }
-    Ok(path)
-}
-
 fn numbered_path(path: &Path, index: u32) -> Result<PathBuf, AppError> {
     let stem = path.file_stem().ok_or_else(|| {
         output_error(
@@ -629,26 +631,138 @@ fn backup_path_for(path: &Path, marker: &str) -> Result<PathBuf, AppError> {
 }
 
 fn normalize_output_root(path: &Path) -> Result<PathBuf, AppError> {
-    if path.exists() {
-        return fs::canonicalize(path).map_err(|_| {
-            output_error(
-                "output.directory_unavailable",
-                "errors.outputDirectoryUnavailable",
-                "The output directory could not be normalized.",
-                path,
-                true,
-            )
-        });
+    let absolute = std::path::absolute(path)
+        .map(|absolute| normalize_path_components(&absolute))
+        .map_err(|_| output_directory_unavailable(path))?;
+
+    if absolute.exists() {
+        if !absolute.is_dir() {
+            return Err(output_directory_not_directory(&absolute));
+        }
+        return fs::canonicalize(&absolute).map_err(|_| output_directory_unavailable(path));
     }
-    std::path::absolute(path).map_err(|_| {
-        output_error(
-            "output.directory_unavailable",
-            "errors.outputDirectoryUnavailable",
-            "The output directory could not be normalized.",
-            path,
-            true,
-        )
+
+    // Lexical normalization removes `.`/`..` before paths are reserved. If a
+    // future output directory is below a symlink/junction, resolve its deepest
+    // existing ancestor now so comparisons use the same identity as inputs.
+    canonicalize_existing_ancestor(&absolute).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotADirectory {
+            output_directory_not_directory(path)
+        } else {
+            output_directory_unavailable(path)
+        }
     })
+}
+
+fn canonicalize_existing_ancestor(path: &Path) -> std::io::Result<PathBuf> {
+    let mut ancestor = path;
+    let mut missing_components = Vec::new();
+    while !ancestor.exists() {
+        let component = ancestor.file_name().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "output path has no existing ancestor",
+            )
+        })?;
+        missing_components.push(component.to_os_string());
+        ancestor = ancestor.parent().ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "output path has no existing ancestor",
+            )
+        })?;
+    }
+
+    if !fs::metadata(ancestor)?.is_dir() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotADirectory,
+            "output path ancestor is not a directory",
+        ));
+    }
+    let canonical_ancestor = fs::canonicalize(ancestor)?;
+    // Avoid changing the externally visible path spelling merely because
+    // Windows canonicalization adds a verbatim prefix. A genuinely redirected
+    // ancestor (symlink/junction) must use its canonical target for safety.
+    if same_path_spelling(&canonical_ancestor, ancestor) {
+        return Ok(path.to_path_buf());
+    }
+
+    let mut resolved = canonical_ancestor;
+    for component in missing_components.into_iter().rev() {
+        resolved.push(component);
+    }
+    Ok(resolved)
+}
+
+fn normalize_path_components(path: &Path) -> PathBuf {
+    use std::path::Component;
+
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
+                normalized.push(component.as_os_str());
+            }
+            Component::CurDir => {}
+            Component::ParentDir => {
+                // `path` is absolute, so popping at its root simply leaves the
+                // root in place instead of allowing traversal above it.
+                normalized.pop();
+            }
+        }
+    }
+    normalized
+}
+
+#[cfg(windows)]
+fn same_path_spelling(left: &Path, right: &Path) -> bool {
+    windows_path_spelling(&left.to_string_lossy())
+        .eq_ignore_ascii_case(&windows_path_spelling(&right.to_string_lossy()))
+}
+
+#[cfg(windows)]
+fn windows_path_spelling(path: &str) -> String {
+    const VERBATIM_UNC_PREFIX: &str = r"\\?\UNC\";
+    const VERBATIM_PREFIX: &str = r"\\?\";
+
+    if path
+        .get(..VERBATIM_UNC_PREFIX.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(VERBATIM_UNC_PREFIX))
+    {
+        return format!(r"\\{}", &path[VERBATIM_UNC_PREFIX.len()..]);
+    }
+    if path
+        .get(..VERBATIM_PREFIX.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(VERBATIM_PREFIX))
+    {
+        return path[VERBATIM_PREFIX.len()..].to_owned();
+    }
+    path.to_owned()
+}
+
+#[cfg(not(windows))]
+fn same_path_spelling(left: &Path, right: &Path) -> bool {
+    left == right
+}
+
+fn output_directory_unavailable(path: &Path) -> AppError {
+    output_error(
+        "output.directory_unavailable",
+        "errors.outputDirectoryUnavailable",
+        "The output directory could not be normalized.",
+        path,
+        true,
+    )
+}
+
+fn output_directory_not_directory(path: &Path) -> AppError {
+    output_error(
+        "output.directory_not_directory",
+        "errors.outputDirectoryInvalid",
+        "The selected output location is not a directory.",
+        path,
+        false,
+    )
 }
 
 fn is_supported_input(path: &Path) -> bool {
@@ -739,4 +853,18 @@ fn path_identity(path: &Path) -> PathIdentity {
 #[cfg(not(windows))]
 fn path_identity(path: &Path) -> PathIdentity {
     path.to_path_buf()
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::same_path_spelling;
+    use std::path::Path;
+
+    #[test]
+    fn verbatim_unc_and_standard_unc_have_the_same_spelling() {
+        assert!(same_path_spelling(
+            Path::new(r"\\?\UNC\server\share\future"),
+            Path::new(r"\\server\share\future"),
+        ));
+    }
 }
