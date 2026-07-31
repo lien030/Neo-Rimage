@@ -1,3 +1,8 @@
+// AppError and CommandErrorEnvelope are stable, serde-backed value contracts.
+// Boxing every Result error would spread an internal size concern through the
+// engine, scheduler, and Tauri command APIs without changing IPC payload size.
+#![allow(clippy::result_large_err)]
+
 pub mod backend;
 pub mod domain;
 pub mod engine;
@@ -20,7 +25,7 @@ use {window_vibrancy::apply_acrylic, window_vibrancy::apply_mica, windows_versio
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let maximum_concurrency = System::physical_core_count().unwrap_or(2).max(1);
+    let maximum_concurrency = available_physical_cores();
     let service = BackendService::new(maximum_concurrency)
         .expect("failed to initialize the neo-rimage backend");
     service
@@ -74,6 +79,8 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
+    // Tauri may report more than one exit request during teardown. Only the
+    // first request should initiate the blocking cooperative-shutdown wait.
     let shutdown_started = AtomicBool::new(false);
     app.run(move |_app_handle, event| {
         if matches!(event, tauri::RunEvent::ExitRequested { .. })
@@ -86,6 +93,10 @@ pub fn run() {
 
 #[tauri::command]
 fn get_cpus() -> usize {
+    available_physical_cores()
+}
+
+fn available_physical_cores() -> usize {
     System::physical_core_count().unwrap_or(2).max(1)
 }
 

@@ -1,5 +1,5 @@
 use super::{
-    output::{CommitPolicy, OutputTransaction},
+    output::{CommitOutcome, CommitPolicy, OutputTransaction},
     pipeline::{self, ResizeEffect},
     runtime::EngineContext,
     validation::{request_context, same_path, validate_request},
@@ -53,31 +53,7 @@ impl LocalEngine {
             ProcessingStage::Inspect,
             || {
                 check_cancel(request, ProcessingStage::Inspect, context.cancellation)?;
-                let metadata = fs::metadata(&request.input_path).map_err(|_| {
-                    engine_error(
-                        request,
-                        ProcessingStage::Inspect,
-                        ErrorCategory::Input,
-                        "input.metadata_unavailable",
-                        "errors.inputUnavailable",
-                        "The input file could not be inspected.",
-                        false,
-                        &request.input_path,
-                    )
-                })?;
-                if !metadata.is_file() {
-                    return Err(engine_error(
-                        request,
-                        ProcessingStage::Inspect,
-                        ErrorCategory::Input,
-                        "input.not_regular_file",
-                        "errors.inputNotRegularFile",
-                        "The input path is not a regular file.",
-                        false,
-                        &request.input_path,
-                    ));
-                }
-                Ok(metadata.len())
+                inspect_input(request)
             },
         )?;
 
@@ -87,30 +63,7 @@ impl LocalEngine {
             ProcessingStage::Decode,
             || {
                 check_cancel(request, ProcessingStage::Decode, context.cancellation)?;
-                let image = pipeline::decode(&request.input_path).map_err(|_| {
-                    engine_error(
-                        request,
-                        ProcessingStage::Decode,
-                        ErrorCategory::Input,
-                        "input.decode_failed",
-                        "errors.decodeFailed",
-                        "The input is damaged or uses an unsupported image format.",
-                        false,
-                        &request.input_path,
-                    )
-                })?;
-                if image.frames_len() > 1 {
-                    return Err(engine_error(
-                        request,
-                        ProcessingStage::Decode,
-                        ErrorCategory::Input,
-                        "input.animation_unsupported",
-                        "errors.animationUnsupported",
-                        "Animated input is not supported by this processing pipeline without discarding frames.",
-                        false,
-                        &request.input_path,
-                    ));
-                }
+                let image = decode_input(request)?;
                 check_cancel(request, ProcessingStage::Decode, context.cancellation)?;
                 Ok(image)
             },
@@ -221,50 +174,7 @@ impl LocalEngine {
             ProcessingStage::Encode,
             || {
                 check_cancel(request, ProcessingStage::Encode, context.cancellation)?;
-                let mut transaction =
-                    OutputTransaction::begin(&request.output.output_path, request.item_id.as_str())
-                        .map_err(|_| {
-                            engine_error(
-                                request,
-                                ProcessingStage::Encode,
-                                ErrorCategory::Output,
-                                "output.temp_create_failed",
-                                "errors.outputTempCreateFailed",
-                                "A temporary output file could not be created.",
-                                true,
-                                &request.output.output_path,
-                            )
-                        })?;
-
-                pipeline::encode(
-                    &image,
-                    &request.encoder,
-                    transaction.writer().map_err(|_| {
-                        engine_error(
-                            request,
-                            ProcessingStage::Encode,
-                            ErrorCategory::Output,
-                            "output.temp_unavailable",
-                            "errors.outputTempUnavailable",
-                            "The temporary output file is unavailable.",
-                            true,
-                            &request.output.output_path,
-                        )
-                    })?,
-                )
-                .map_err(|_| {
-                    engine_error(
-                        request,
-                        ProcessingStage::Encode,
-                        ErrorCategory::Encoding,
-                        "encoding.encoder_failed",
-                        "errors.encodingFailed",
-                        "The selected encoder could not encode the processed image.",
-                        false,
-                        &request.output.output_path,
-                    )
-                })?;
-
+                let transaction = encode_to_transaction(request, &image)?;
                 check_cancel(request, ProcessingStage::Encode, context.cancellation)?;
                 Ok(transaction)
             },
@@ -280,18 +190,7 @@ impl LocalEngine {
                     ProcessingStage::MetadataFinalize,
                     context.cancellation,
                 )?;
-                let bytes = transaction.sync().map_err(|_| {
-                    engine_error(
-                        request,
-                        ProcessingStage::MetadataFinalize,
-                        ErrorCategory::Output,
-                        "output.temp_validation_failed",
-                        "errors.outputValidationFailed",
-                        "The encoded temporary output did not pass validation.",
-                        true,
-                        transaction.temp_path(),
-                    )
-                })?;
+                let bytes = sync_transaction(request, &mut transaction)?;
                 check_cancel(
                     request,
                     ProcessingStage::MetadataFinalize,
@@ -307,29 +206,7 @@ impl LocalEngine {
             ProcessingStage::Commit,
             || {
                 check_cancel(request, ProcessingStage::Commit, context.cancellation)?;
-                transaction.commit(commit_policy(request)).map_err(|error| {
-                    let (code, fallback) = if error.kind() == std::io::ErrorKind::AlreadyExists {
-                        (
-                            "output.collision",
-                            "The output target or backup already exists.",
-                        )
-                    } else {
-                        (
-                            "output.commit_failed",
-                            "The temporary output could not be committed safely.",
-                        )
-                    };
-                    engine_error(
-                        request,
-                        ProcessingStage::Commit,
-                        ErrorCategory::Output,
-                        code,
-                        "errors.outputCommitFailed",
-                        fallback,
-                        true,
-                        &request.output.output_path,
-                    )
-                })
+                commit_transaction(request, transaction)
             },
         )?;
 
@@ -382,6 +259,161 @@ impl Engine for LocalEngine {
     fn execute(&self, request: &EngineRequest, context: &EngineContext<'_>) -> EngineOutcome {
         self.execute_inner(request, context)
     }
+}
+
+fn inspect_input(request: &EngineRequest) -> Result<u64, AppError> {
+    let metadata = fs::metadata(&request.input_path).map_err(|_| {
+        engine_error(
+            request,
+            ProcessingStage::Inspect,
+            ErrorCategory::Input,
+            "input.metadata_unavailable",
+            "errors.inputUnavailable",
+            "The input file could not be inspected.",
+            false,
+            &request.input_path,
+        )
+    })?;
+    if !metadata.is_file() {
+        return Err(engine_error(
+            request,
+            ProcessingStage::Inspect,
+            ErrorCategory::Input,
+            "input.not_regular_file",
+            "errors.inputNotRegularFile",
+            "The input path is not a regular file.",
+            false,
+            &request.input_path,
+        ));
+    }
+    Ok(metadata.len())
+}
+
+fn decode_input(request: &EngineRequest) -> Result<zune_image::image::Image, AppError> {
+    let image = pipeline::decode(&request.input_path).map_err(|_| {
+        engine_error(
+            request,
+            ProcessingStage::Decode,
+            ErrorCategory::Input,
+            "input.decode_failed",
+            "errors.decodeFailed",
+            "The input is damaged or uses an unsupported image format.",
+            false,
+            &request.input_path,
+        )
+    })?;
+    if image.frames_len() > 1 {
+        return Err(engine_error(
+            request,
+            ProcessingStage::Decode,
+            ErrorCategory::Input,
+            "input.animation_unsupported",
+            "errors.animationUnsupported",
+            "Animated input is not supported by this processing pipeline without discarding frames.",
+            false,
+            &request.input_path,
+        ));
+    }
+    Ok(image)
+}
+
+fn encode_to_transaction(
+    request: &EngineRequest,
+    image: &zune_image::image::Image,
+) -> Result<OutputTransaction, AppError> {
+    let mut transaction =
+        OutputTransaction::begin(&request.output.output_path, request.item_id.as_str()).map_err(
+            |_| {
+                engine_error(
+                    request,
+                    ProcessingStage::Encode,
+                    ErrorCategory::Output,
+                    "output.temp_create_failed",
+                    "errors.outputTempCreateFailed",
+                    "A temporary output file could not be created.",
+                    true,
+                    &request.output.output_path,
+                )
+            },
+        )?;
+
+    pipeline::encode(
+        image,
+        &request.encoder,
+        transaction.writer().map_err(|_| {
+            engine_error(
+                request,
+                ProcessingStage::Encode,
+                ErrorCategory::Output,
+                "output.temp_unavailable",
+                "errors.outputTempUnavailable",
+                "The temporary output file is unavailable.",
+                true,
+                &request.output.output_path,
+            )
+        })?,
+    )
+    .map_err(|_| {
+        engine_error(
+            request,
+            ProcessingStage::Encode,
+            ErrorCategory::Encoding,
+            "encoding.encoder_failed",
+            "errors.encodingFailed",
+            "The selected encoder could not encode the processed image.",
+            false,
+            &request.output.output_path,
+        )
+    })?;
+
+    Ok(transaction)
+}
+
+fn sync_transaction(
+    request: &EngineRequest,
+    transaction: &mut OutputTransaction,
+) -> Result<u64, AppError> {
+    transaction.sync().map_err(|_| {
+        engine_error(
+            request,
+            ProcessingStage::MetadataFinalize,
+            ErrorCategory::Output,
+            "output.temp_validation_failed",
+            "errors.outputValidationFailed",
+            "The encoded temporary output did not pass validation.",
+            true,
+            transaction.temp_path(),
+        )
+    })
+}
+
+fn commit_transaction(
+    request: &EngineRequest,
+    transaction: OutputTransaction,
+) -> Result<CommitOutcome, AppError> {
+    transaction.commit(commit_policy(request)).map_err(|error| {
+        let (code, fallback) = if error.kind() == std::io::ErrorKind::AlreadyExists {
+            (
+                "output.collision",
+                "The output target or backup already exists.",
+            )
+        } else {
+            (
+                "output.commit_failed",
+                "The temporary output could not be committed safely.",
+            )
+        };
+        engine_error(
+            request,
+            ProcessingStage::Commit,
+            ErrorCategory::Output,
+            code,
+            "errors.outputCommitFailed",
+            fallback,
+            true,
+            &request.output.output_path,
+        )
+    })
 }
 
 fn apply_operations(
@@ -536,6 +568,9 @@ fn commit_policy(request: &EngineRequest) -> CommitPolicy {
     }
 }
 
+// Keeping the complete stable error vocabulary visible at call sites is more
+// useful here than hiding its fields behind a short-lived builder type.
+#[allow(clippy::too_many_arguments)]
 fn engine_error(
     request: &EngineRequest,
     stage: ProcessingStage,

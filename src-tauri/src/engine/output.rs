@@ -254,13 +254,7 @@ fn parent_or_current(path: &Path) -> &Path {
 fn safe_file_label(value: &str) -> String {
     let mut result = value
         .chars()
-        .filter_map(|character| {
-            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
-                Some(character)
-            } else {
-                None
-            }
-        })
+        .filter(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
         .take(48)
         .collect::<String>();
 

@@ -6,7 +6,7 @@ use crate::{
     backend::{command_error, manager_command_error, BackendService},
     domain::{
         AppError, BackendCapabilities, BackendSnapshot, CommandAccepted, CommandErrorEnvelope,
-        CorrelationId, CreateJobCommand, CreateJobResponse, ErrorCategory, JobCommand,
+        CorrelationId, CreateJobCommand, CreateJobResponse, ErrorCategory, ItemId, JobCommand,
         JobCommandResponse, JobDetailSnapshot, JobId, RetryItemsCommand, SchedulerCommandResponse,
         SetSchedulerPausedCommand, SetWorkerCountCommand, StateEvent, StateEventEnvelope,
         WorkerCountCommandResponse, IPC_SCHEMA_VERSION, STATE_EVENT_NAME,
@@ -64,6 +64,9 @@ pub async fn create_job(
 ) -> Result<CreateJobResponse, CommandErrorEnvelope> {
     let service = service.inner().clone();
     let correlation_id = command.correlation_id.clone();
+    // Input discovery and canonicalization are blocking filesystem work. Keep
+    // them off Tauri's async command executor even though submission itself is
+    // an in-memory manager operation.
     tauri::async_runtime::spawn_blocking(move || service.create_job(command))
         .await
         .map_err(|_| {
@@ -116,51 +119,13 @@ pub fn retry_job_items(
 ) -> Result<JobCommandResponse, CommandErrorEnvelope> {
     ensure_schema(command.schema_version, &command.correlation_id)?;
     let job_id = command.job_id.clone();
-    let result = if command.item_ids.is_empty() {
-        service
-            .manager()
-            .retry_job(
-                &job_id,
-                if command.include_cancelled {
-                    RetryMode::FailedAndCancelled
-                } else {
-                    RetryMode::FailedOnly
-                },
-            )
-            .map(|_| ())
-    } else if command.item_ids.len() == 1 {
-        let belongs_to_job = service
-            .manager()
-            .job_detail_snapshot(&job_id, 0, u32::MAX)
-            .map_err(|error| manager_command_error(command.correlation_id.clone(), error))?
-            .items
-            .items
-            .iter()
-            .any(|item| item.id == command.item_ids[0]);
-        if !belongs_to_job {
-            return Err(command_error(
-                command.correlation_id,
-                AppError::new(
-                    "item.job_mismatch",
-                    ErrorCategory::Validation,
-                    "errors.itemJobMismatch",
-                    "The selected item does not belong to the requested job.",
-                ),
-            ));
-        }
-        service.manager().retry_item(&command.item_ids[0])
-    } else {
-        return Err(command_error(
-            command.correlation_id,
-            AppError::new(
-                "job.batch_item_retry_unavailable",
-                ErrorCategory::Validation,
-                "errors.batchRetryUnavailable",
-                "Retrying a selected group of items is not available yet.",
-            ),
-        ));
-    };
-    result.map_err(|error| manager_command_error(command.correlation_id.clone(), error))?;
+    retry_selection(
+        &service,
+        &command.correlation_id,
+        &job_id,
+        &command.item_ids,
+        command.include_cancelled,
+    )?;
     accepted_job(&service, command.correlation_id, &job_id)
 }
 
@@ -170,6 +135,9 @@ pub fn remove_job(
     command: JobCommand,
 ) -> Result<JobCommandResponse, CommandErrorEnvelope> {
     ensure_schema(command.schema_version, &command.correlation_id)?;
+    // Capture the final job view before deletion. The response envelope uses
+    // the later clearing revision, while its payload describes what was
+    // removed and can no longer be queried from the manager.
     let snapshot = service
         .manager()
         .job_snapshot(&command.job_id)
@@ -244,6 +212,62 @@ fn run_job_command(
     action(service, &command.job_id)
         .map_err(|error| manager_command_error(command.correlation_id.clone(), error))?;
     accepted_job(service, command.correlation_id, &command.job_id)
+}
+
+fn retry_selection(
+    service: &BackendService,
+    correlation_id: &CorrelationId,
+    job_id: &JobId,
+    item_ids: &[ItemId],
+    include_cancelled: bool,
+) -> Result<(), CommandErrorEnvelope> {
+    let result = match item_ids {
+        [] => service
+            .manager()
+            .retry_job(
+                job_id,
+                if include_cancelled {
+                    RetryMode::FailedAndCancelled
+                } else {
+                    RetryMode::FailedOnly
+                },
+            )
+            .map(|_| ()),
+        [item_id] => {
+            let belongs_to_job = service
+                .manager()
+                .job_detail_snapshot(job_id, 0, u32::MAX)
+                .map_err(|error| manager_command_error(correlation_id.clone(), error))?
+                .items
+                .items
+                .iter()
+                .any(|item| item.id == *item_id);
+            if !belongs_to_job {
+                return Err(command_error(
+                    correlation_id.clone(),
+                    AppError::new(
+                        "item.job_mismatch",
+                        ErrorCategory::Validation,
+                        "errors.itemJobMismatch",
+                        "The selected item does not belong to the requested job.",
+                    ),
+                ));
+            }
+            service.manager().retry_item(item_id)
+        }
+        _ => {
+            return Err(command_error(
+                correlation_id.clone(),
+                AppError::new(
+                    "job.batch_item_retry_unavailable",
+                    ErrorCategory::Validation,
+                    "errors.batchRetryUnavailable",
+                    "Retrying a selected group of items is not available yet.",
+                ),
+            ));
+        }
+    };
+    result.map_err(|error| manager_command_error(correlation_id.clone(), error))
 }
 
 fn accepted_job(

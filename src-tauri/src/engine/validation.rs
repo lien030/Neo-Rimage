@@ -256,12 +256,12 @@ fn validate_operations(request: &EngineRequest, fields: &mut Vec<FieldError>) {
                         "errors.resizeZeroDimension",
                     ))
                 }
-                ResizeMode::FitWidth { width } if width == 0 => fields.push(field_error(
+                ResizeMode::FitWidth { width: 0 } => fields.push(field_error(
                     &path("config.mode"),
                     "resize.zero_dimension",
                     "errors.resizeZeroDimension",
                 )),
-                ResizeMode::FitHeight { height } if height == 0 => fields.push(field_error(
+                ResizeMode::FitHeight { height: 0 } => fields.push(field_error(
                     &path("config.mode"),
                     "resize.zero_dimension",
                     "errors.resizeZeroDimension",
