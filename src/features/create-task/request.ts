@@ -1,23 +1,29 @@
 import {
+  generateCorrelationId,
   IPC_SCHEMA_VERSION,
   type AvifConfig,
   type CreateJobRequest,
   type EncoderConfig,
   type EncoderKind,
   type JpegConfig,
+  type MetadataPolicy,
   type MozJpegConfig,
   type Operation,
+  type OutputPolicy,
   type OxiPngConfig,
   type ResizeMode,
   type WebPConfig,
-} from "@/lib/ipc/contracts";
+} from "@/lib/ipc";
 
-import type { CreateTaskFormValues } from "./domain";
+import type {
+  CreateTaskFormValues,
+  MetadataDraftValue,
+  OutputDraftValue,
+  ResizeDraftValue,
+} from "./domain";
+import type { SelectedInputFile } from "./input-files";
 
-export interface TaskCacheInput {
-  path: string;
-  fileName: string;
-}
+const MAX_IMAGE_DIMENSION = 4_294_967_295;
 
 export type CreateTaskValidationCode =
   | "inputs_required"
@@ -50,13 +56,15 @@ export class CreateTaskValidationError extends Error {
 
 export function buildCreateJobRequest(
   draft: CreateTaskFormValues,
-  taskCache: readonly TaskCacheInput[],
+  selectedInputs: readonly SelectedInputFile[],
   availableEncoders: readonly EncoderKind[],
 ): CreateJobRequest {
-  if (taskCache.length === 0) {
+  // This is the form-to-IPC boundary: draft strings remain editable until all
+  // values have been validated and converted into the versioned DTO below.
+  if (selectedInputs.length === 0) {
     throw new CreateTaskValidationError("inputs_required");
   }
-  if (taskCache.some((input) => input.path.trim().length === 0)) {
+  if (selectedInputs.some((input) => input.path.trim().length === 0)) {
     throw new CreateTaskValidationError("input_path_required");
   }
   if (!availableEncoders.includes(draft.activeEncoder)) {
@@ -64,87 +72,101 @@ export function buildCreateJobRequest(
   }
 
   const encoder = buildEncoderConfig(draft);
-
-  const operations: Operation[] = [];
-  if (draft.resize.enabled) {
-    const mode: ResizeMode = {
-      kind: "exact",
-      value: {
-        width: requiredInteger(
-          draft.resize.width,
-          1,
-          4_294_967_295,
-          "resize_width_invalid",
-        ),
-        height: requiredInteger(
-          draft.resize.height,
-          1,
-          4_294_967_295,
-          "resize_height_invalid",
-        ),
-      },
-    };
-    operations.push({
-      kind: "resize",
-      config: {
-        mode,
-        filter: draft.resize.filter,
-        allowUpscale: draft.resize.allowUpscale,
-        allowDownscale: draft.resize.allowDownscale,
-      },
-    });
-  }
-
-  const outputDirectory = draft.output.outputDirectory.trim();
-  if (draft.output.locationMode === "directory" && !outputDirectory) {
-    throw new CreateTaskValidationError("output_directory_required");
-  }
-  if (
-    /[\\/:*?"<>|\0]/u.test(draft.output.suffix) ||
-    draft.output.suffix.includes("..")
-  ) {
-    throw new CreateTaskValidationError("suffix_invalid");
-  }
-  if (
-    draft.output.collision !== "replace" &&
-    (draft.output.sourceBackup || draft.output.existingOutputBackup)
-  ) {
-    throw new CreateTaskValidationError("backup_requires_replace");
-  }
+  const operations = buildOperations(draft.resize);
+  const output = buildOutputPolicy(draft.output);
 
   return {
     schemaVersion: IPC_SCHEMA_VERSION,
-    inputs: taskCache.map((input) => ({
+    inputs: selectedInputs.map((input) => ({
       path: input.path,
       kind: "file",
       scanRecursively: false,
     })),
     operations,
     encoder,
-    output: {
-      location:
-        draft.output.locationMode === "same_directory"
-          ? { kind: "same_directory" }
-          : { kind: "directory", path: outputDirectory },
-      preserveStructure:
-        draft.output.locationMode === "directory" &&
-        draft.output.preserveStructure,
-      suffix: draft.output.suffix,
-      collision: draft.output.collision,
-      sourceBackup: draft.output.sourceBackup ? "enabled" : "disabled",
-      existingOutputBackup: draft.output.existingOutputBackup
-        ? "enabled"
-        : "disabled",
-    },
-    metadata: {
-      embedded: draft.metadata.embedded,
-      colorProfile: draft.metadata.colorProfile,
-      report: draft.metadata.reportEnabled
-        ? { kind: "json", path: draft.metadata.reportPath.trim() }
-        : { kind: "disabled" },
-    },
+    output,
+    metadata: buildMetadataPolicy(draft.metadata),
     inputAcceptance: draft.inputAcceptance,
     scheduling: null,
+  };
+}
+
+function buildOperations(resize: ResizeDraftValue): Operation[] {
+  if (!resize.enabled) {
+    return [];
+  }
+
+  // Only exact dimensions are exposed by the current form. Keeping the
+  // conversion explicit prevents unused draft fields from leaking over IPC.
+  const mode: ResizeMode = {
+    kind: "exact",
+    value: {
+      width: requiredInteger(
+        resize.width,
+        1,
+        MAX_IMAGE_DIMENSION,
+        "resize_width_invalid",
+      ),
+      height: requiredInteger(
+        resize.height,
+        1,
+        MAX_IMAGE_DIMENSION,
+        "resize_height_invalid",
+      ),
+    },
+  };
+
+  return [
+    {
+      kind: "resize",
+      config: {
+        mode,
+        filter: resize.filter,
+        allowUpscale: resize.allowUpscale,
+        allowDownscale: resize.allowDownscale,
+      },
+    },
+  ];
+}
+
+function buildOutputPolicy(output: OutputDraftValue): OutputPolicy {
+  const outputDirectory = output.outputDirectory.trim();
+  if (output.locationMode === "directory" && !outputDirectory) {
+    throw new CreateTaskValidationError("output_directory_required");
+  }
+  if (/[\\/:*?"<>|\0]/u.test(output.suffix) || output.suffix.includes("..")) {
+    throw new CreateTaskValidationError("suffix_invalid");
+  }
+  if (
+    output.collision !== "replace" &&
+    (output.sourceBackup || output.existingOutputBackup)
+  ) {
+    throw new CreateTaskValidationError("backup_requires_replace");
+  }
+
+  return {
+    location:
+      output.locationMode === "same_directory"
+        ? { kind: "same_directory" }
+        : { kind: "directory", path: outputDirectory },
+    preserveStructure:
+      output.locationMode === "directory" && output.preserveStructure,
+    suffix: output.suffix,
+    collision: output.collision,
+    sourceBackup: output.sourceBackup ? "enabled" : "disabled",
+    existingOutputBackup: output.existingOutputBackup
+      ? "enabled"
+      : "disabled",
+  };
+}
+
+function buildMetadataPolicy(metadata: MetadataDraftValue): MetadataPolicy {
+  return {
+    embedded: metadata.embedded,
+    colorProfile: metadata.colorProfile,
+    report: metadata.reportEnabled
+      ? { kind: "json", path: metadata.reportPath.trim() }
+      : { kind: "disabled" },
   };
 }
 
@@ -275,10 +297,7 @@ function buildMozJpegConfig(draft: CreateTaskFormValues): MozJpegConfig {
 }
 
 export function createCorrelationId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `create-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return generateCorrelationId("create");
 }
 
 function requiredNumber(

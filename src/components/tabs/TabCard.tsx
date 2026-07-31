@@ -1,55 +1,67 @@
+import type { ReactNode } from "react";
+
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
 
-export default function TabCard({
-  variant = "number",
-  title,
-  value,
-  onValueChange,
-  min,
-  max,
-  placeholder,
-  disabled = false,
-  children,
-}: {
-  variant?: "number" | "string" | "boolean" | "none";
+interface BaseTabCardProps {
   title: string;
-  value?: string | boolean;
-  onValueChange?: (value: string | boolean) => void;
+  disabled?: boolean;
+}
+
+interface NumberTabCardProps extends BaseTabCardProps {
+  variant?: "number";
+  value: string;
+  onValueChange: (value: string) => void;
   min?: number;
   max?: number;
   placeholder?: string;
-  disabled?: boolean;
-  children?: React.ReactNode;
-}) {
+}
+
+interface BooleanTabCardProps extends BaseTabCardProps {
+  variant: "boolean";
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+}
+
+interface ContentTabCardProps extends BaseTabCardProps {
+  variant: "none";
+  children: ReactNode;
+}
+
+type TabCardProps =
+  | NumberTabCardProps
+  | BooleanTabCardProps
+  | ContentTabCardProps;
+
+export default function TabCard(props: TabCardProps) {
   return (
-    <div className="flex h-[72px] min-w-0 w-full flex-col justify-between rounded-lg border bg-white px-2 py-1 text-[0.775rem] select-none">
+    <div className="flex h-[72px] w-full min-w-0 select-none flex-col justify-between rounded-lg border bg-white px-2 py-1 text-[0.775rem]">
       <span className="flex min-w-0 items-center justify-between gap-1">
-        <p className="min-w-0 truncate font-bold" title={title}>
-          {title}
+        <p className="min-w-0 truncate font-bold" title={props.title}>
+          {props.title}
         </p>
-        {variant === "boolean" && (
+        {props.variant === "boolean" && (
           <Switch
             size="sm"
-            checked={value === true}
-            disabled={disabled}
-            onCheckedChange={(checked) => onValueChange?.(checked)}
+            checked={props.value}
+            disabled={props.disabled}
+            onCheckedChange={props.onValueChange}
           />
         )}
       </span>
-      {variant === "number" && (
+      {(props.variant === undefined || props.variant === "number") && (
         <Input
-          type={variant === "number" ? "number" : "text"}
-          value={typeof value === "string" ? value : ""}
-          placeholder={placeholder}
-          min={variant === "number" ? min : undefined}
-          max={variant === "number" ? max : undefined}
-          disabled={disabled}
+          type="number"
+          value={props.value}
+          placeholder={props.placeholder}
+          min={props.min}
+          max={props.max}
+          disabled={props.disabled}
           className="my-1 h-7 px-1.5 text-right"
-          onChange={(event) => onValueChange?.(event.target.value)}
+          onChange={(event) => props.onValueChange(event.target.value)}
         />
       )}
-      {children}
+      {props.variant === "none" && props.children}
     </div>
   );
 }

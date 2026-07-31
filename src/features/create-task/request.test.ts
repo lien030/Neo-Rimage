@@ -345,4 +345,89 @@ describe("buildCreateJobRequest", () => {
       },
     ]);
   });
+
+  it("serializes output and metadata policies", () => {
+    const request = buildCreateJobRequest(
+      draftWith({
+        output: {
+          locationMode: "directory",
+          outputDirectory: "  C:/images/output  ",
+          preserveStructure: true,
+          suffix: "-converted",
+          collision: "replace",
+          sourceBackup: true,
+          existingOutputBackup: true,
+        },
+        metadata: {
+          embedded: "strip",
+          colorProfile: "convert_to_srgb",
+          reportEnabled: true,
+          reportPath: "  C:/images/report.json  ",
+        },
+      }),
+      SAMPLE_INPUTS,
+      ALL_ENCODERS,
+    );
+
+    expect(request.output).toEqual({
+      location: { kind: "directory", path: "C:/images/output" },
+      preserveStructure: true,
+      suffix: "-converted",
+      collision: "replace",
+      sourceBackup: "enabled",
+      existingOutputBackup: "enabled",
+    });
+    expect(request.metadata).toEqual({
+      embedded: "strip",
+      colorProfile: "convert_to_srgb",
+      report: { kind: "json", path: "C:/images/report.json" },
+    });
+  });
+
+  it("validates output policy invariants", () => {
+    expectValidationCode(
+      () =>
+        buildCreateJobRequest(
+          draftWith({
+            output: {
+              ...createDefaultCreateTaskForm().output,
+              locationMode: "directory",
+            },
+          }),
+          SAMPLE_INPUTS,
+          ALL_ENCODERS,
+        ),
+      "output_directory_required",
+    );
+
+    expectValidationCode(
+      () =>
+        buildCreateJobRequest(
+          draftWith({
+            output: {
+              ...createDefaultCreateTaskForm().output,
+              suffix: "../invalid",
+            },
+          }),
+          SAMPLE_INPUTS,
+          ALL_ENCODERS,
+        ),
+      "suffix_invalid",
+    );
+
+    expectValidationCode(
+      () =>
+        buildCreateJobRequest(
+          draftWith({
+            output: {
+              ...createDefaultCreateTaskForm().output,
+              sourceBackup: true,
+            },
+          }),
+          SAMPLE_INPUTS,
+          ALL_ENCODERS,
+        ),
+      "backup_requires_replace",
+    );
+  });
 });

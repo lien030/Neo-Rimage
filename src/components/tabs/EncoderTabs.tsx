@@ -1,7 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   createTaskDraft,
-  markCreateTaskDirty,
+  updateCreateTaskDraft,
 } from "@/features/create-task";
 import type { BackendSyncStatus } from "@/features/backend";
 import type {
@@ -31,7 +31,14 @@ const ENCODER_LABELS: Record<EncoderKind, string> = {
   qoi: "QOI",
 };
 
-const OPTIONLESS_DESCRIPTION_KEYS: Partial<Record<EncoderKind, string>> = {
+type OptionlessEncoderKind =
+  | "jpeg_xl"
+  | "png"
+  | "farbfeld"
+  | "ppm"
+  | "qoi";
+
+const OPTIONLESS_DESCRIPTION_KEYS: Record<OptionlessEncoderKind, string> = {
   jpeg_xl: "jpegXlDescription",
   png: "pngDescription",
   farbfeld: "farbfeldDescription",
@@ -39,15 +46,17 @@ const OPTIONLESS_DESCRIPTION_KEYS: Partial<Record<EncoderKind, string>> = {
   qoi: "qoiDescription",
 };
 
+interface EncoderTabsProps {
+  capabilities: readonly EncoderCapability[] | null;
+  syncStatus: BackendSyncStatus;
+  lastError: string | null;
+}
+
 export default function EncoderTabs({
   capabilities,
   syncStatus,
   lastError,
-}: {
-  capabilities: readonly EncoderCapability[] | null;
-  syncStatus: BackendSyncStatus;
-  lastError: string | null;
-}) {
+}: EncoderTabsProps) {
   const { t } = useTranslation();
   const draft = useSnapshot(createTaskDraft);
 
@@ -72,8 +81,8 @@ export default function EncoderTabs({
     );
   }
 
-  // Single source of truth: only render the draft's encoder. Parent aligns
-  // draft.activeEncoder when capabilities make the current choice unavailable.
+  // The dialog owns capability reconciliation; this component only renders a
+  // panel once the persisted draft selection is known to be available.
   const selectedCapability = capabilities.find(
     (capability) =>
       capability.kind === draft.activeEncoder && capability.available,
@@ -101,8 +110,9 @@ export default function EncoderTabs({
         if (!capabilities.some((item) => item.kind === kind && item.available)) {
           return;
         }
-        createTaskDraft.activeEncoder = kind;
-        markCreateTaskDirty();
+        updateCreateTaskDraft((draft) => {
+          draft.activeEncoder = kind;
+        });
       }}
     >
       <TabsList className="my-1 grid w-full auto-rows-[1.5rem] grid-cols-[repeat(auto-fit,minmax(4.5rem,1fr))] gap-0.5 group-data-horizontal/tabs:h-auto">
@@ -132,11 +142,7 @@ export default function EncoderTabs({
   );
 }
 
-function EncoderPanelFor({
-  capability,
-}: {
-  capability: EncoderCapability;
-}) {
+function EncoderPanelFor({ capability }: { capability: EncoderCapability }) {
   const { t } = useTranslation();
   const { outputExtensions: extensions } = capability;
 
@@ -158,7 +164,7 @@ function EncoderPanelFor({
     case "qoi":
       return (
         <OptionlessEncoderPanel
-          description={t(OPTIONLESS_DESCRIPTION_KEYS[capability.kind]!)}
+          description={t(OPTIONLESS_DESCRIPTION_KEYS[capability.kind])}
           extensions={extensions}
         />
       );

@@ -1,74 +1,53 @@
-import {
-  appState,
-  taskState,
-  useAppState,
-  useTaskStore,
-} from "@/lib/State";
-import { backendClient, createJobCommand } from "@/lib/ipc";
-import { desktopDir } from "@tauri-apps/api/path";
-import { open } from "@tauri-apps/plugin-dialog";
-import {
-  CreateTaskValidationError,
-  buildCreateJobRequest,
-  createCorrelationId,
-  createTaskDraft,
-  createTaskUiState,
-  markCreateTaskDirty,
-  resetCreateTaskDraft,
-} from "@/features/create-task";
-import { useBackendRuntimeState } from "@/features/backend";
-import type {
-  BackendCapabilities,
-  CollisionPolicy,
-  ResizeFilter,
-} from "@/lib/ipc/contracts";
+import { AlertCircle, Settings } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { useSnapshot } from "valtio";
+
+import { OutputSettingsCard } from "@/components/create-task/OutputSettingsCard";
+import { ResizeSettingsCard } from "@/components/create-task/ResizeSettingsCard";
+import { TaskInputList } from "@/components/create-task/TaskInputList";
+import { createTaskErrorMessage } from "@/components/create-task/create-task-error";
+import EncoderTabs from "@/components/tabs/EncoderTabs";
+import { describeEncoderLimitation } from "@/components/tabs/encoder-limitations";
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/task-dialog";
+} from "@/components/ui/dialog";
+import type { BackendSyncStatus } from "@/features/backend";
+import { useBackendRuntimeState } from "@/features/backend";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import EncoderTabs from "@/components/tabs/EncoderTabs";
-import { describeEncoderLimitation } from "@/components/tabs/encoder-limitations";
-import { AlertCircle, CircleHelp, Settings, X } from "lucide-react";
-import { useEffect, useId, useMemo } from "react";
-import { useTranslation } from "react-i18next";
-import { useSnapshot } from "valtio";
+  CreateTaskValidationError,
+  buildCreateJobRequest,
+  createCorrelationId,
+  createTaskDraft,
+  createTaskInputState,
+  createTaskUiState,
+  markCreateTaskDirty,
+  resetCreateTaskDraft,
+  resetCreateTaskInputs,
+} from "@/features/create-task";
+import { backendClient, createJobCommand } from "@/lib/ipc";
+import type { BackendCapabilities } from "@/lib/ipc/contracts";
+
+interface CreateTaskBackendState {
+  readonly capabilities: BackendCapabilities | null;
+  readonly syncStatus: BackendSyncStatus;
+  readonly lastError: string | null;
+}
 
 export default function CreateTaskDialog() {
-  const app = useAppState();
-  const taskStore = useTaskStore();
+  const { t } = useTranslation();
+  const inputState = useSnapshot(createTaskInputState);
   const ui = useSnapshot(createTaskUiState);
   const draft = useSnapshot(createTaskDraft);
-  // Valtio's recursive snapshot type exceeds TypeScript's instantiation depth
-  // for the full capability contract. Keep the cast local to this read-only view.
-  const backend = useBackendRuntimeState() as unknown as {
-    readonly capabilities: BackendCapabilities | null;
-    readonly syncStatus:
-      | "idle"
-      | "syncing"
-      | "ready"
-      | "needs_resync"
-      | "unavailable";
-    readonly lastError: string | null;
-  };
-  const { t } = useTranslation();
+
+  // Valtio recursively snapshots the capability contract deeply enough to hit
+  // TypeScript's instantiation limit. Keep the workaround at this UI boundary.
+  const backend =
+    useBackendRuntimeState() as unknown as CreateTaskBackendState;
   const encoderCapabilities = backend.capabilities?.encoders ?? null;
   const availableEncoderKinds = useMemo(
     () =>
@@ -85,40 +64,62 @@ export default function CreateTaskDialog() {
       )
       ?.limitations.map((code) => describeEncoderLimitation(code, t))
       .join(" · ") ?? "";
+  const canCreate =
+    !ui.isSubmitting &&
+    availableEncoderKinds.length > 0 &&
+    availableEncoderKinds.includes(draft.activeEncoder);
 
-  // Single owner of draft.activeEncoder alignment when capabilities change.
-  // Do not mark dirty: this is a system correction, not a user edit.
   useEffect(() => {
     if (
       availableEncoderKinds.length > 0 &&
       !availableEncoderKinds.includes(draft.activeEncoder)
     ) {
+      // Capability reconciliation is a system correction, not a user edit.
       createTaskDraft.activeEncoder = availableEncoderKinds[0];
     }
   }, [availableEncoderKinds, draft.activeEncoder]);
 
-  function discardAndClose() {
-    if (createTaskUiState.isSubmitting) return;
-    taskState.taskCache = [];
+  function resetAndClose() {
+    resetCreateTaskInputs();
     resetCreateTaskDraft();
     createTaskUiState.isOpen = false;
-    appState.isShowCreateTask = false;
   }
 
-  function handleRemoveTaskCache(path: string) {
-    if (createTaskUiState.isSubmitting) return;
-    taskState.taskCache = taskState.taskCache.filter((task) => task.path !== path);
+  function discardAndClose() {
+    if (createTaskUiState.isSubmitting) {
+      return;
+    }
+    resetAndClose();
+  }
+
+  function handleOpenChange(open: boolean) {
+    if (open) {
+      createTaskUiState.isOpen = true;
+      return;
+    }
+    discardAndClose();
+  }
+
+  function handleRemoveTask(path: string) {
+    if (createTaskUiState.isSubmitting) {
+      return;
+    }
+    createTaskInputState.files = createTaskInputState.files.filter(
+      (input) => input.path !== path,
+    );
     markCreateTaskDirty();
   }
 
   async function handleCreate() {
-    if (createTaskUiState.isSubmitting) return;
+    if (createTaskUiState.isSubmitting) {
+      return;
+    }
 
     try {
       createTaskUiState.globalError = null;
       const request = buildCreateJobRequest(
         createTaskDraft,
-        taskState.taskCache,
+        createTaskInputState.files,
         availableEncoderKinds,
       );
       createTaskUiState.isSubmitting = true;
@@ -127,10 +128,7 @@ export default function CreateTaskDialog() {
         createJobCommand(createCorrelationId(), request),
       );
 
-      taskState.taskCache = [];
-      resetCreateTaskDraft();
-      createTaskUiState.isOpen = false;
-      appState.isShowCreateTask = false;
+      resetAndClose();
     } catch (error) {
       createTaskUiState.globalError =
         error instanceof CreateTaskValidationError &&
@@ -143,17 +141,7 @@ export default function CreateTaskDialog() {
   }
 
   return (
-    <Dialog
-      open={app.isShowCreateTask}
-      onOpenChange={(open) => {
-        if (open) {
-          createTaskUiState.isOpen = true;
-          appState.isShowCreateTask = true;
-          return;
-        }
-        discardAndClose();
-      }}
-    >
+    <Dialog open={ui.isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
         className="flex h-[min(90vh,900px)] w-[min(96vw,1440px)] max-w-none flex-col overflow-hidden sm:max-w-none"
         showCloseButton={!ui.isSubmitting}
@@ -161,7 +149,9 @@ export default function CreateTaskDialog() {
         onInteractOutside={(event) => event.preventDefault()}
         onOpenAutoFocus={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => {
-          if (ui.isSubmitting) event.preventDefault();
+          if (ui.isSubmitting) {
+            event.preventDefault();
+          }
         }}
       >
         <DialogHeader>
@@ -169,25 +159,14 @@ export default function CreateTaskDialog() {
         </DialogHeader>
 
         <div className="grid min-h-0 w-full flex-1 grid-cols-[clamp(200px,22vw,320px)_minmax(0,1fr)] gap-4">
-          <div className="flex min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-lg border select-none">
-            {taskStore.taskCache.length === 0 ? (
-              <p className="m-auto px-4 text-center text-xs text-muted-foreground">
-                {t("createTaskNoInputs")}
-              </p>
-            ) : (
-              taskStore.taskCache.map((task) => (
-                <TaskCard
-                  fileName={task.fileName}
-                  path={task.path}
-                  disabled={ui.isSubmitting}
-                  onRemove={handleRemoveTaskCache}
-                  key={task.path}
-                />
-              ))
-            )}
-          </div>
+          <TaskInputList
+            tasks={inputState.files}
+            emptyMessage={t("createTaskNoInputs")}
+            disabled={ui.isSubmitting}
+            onRemove={handleRemoveTask}
+          />
 
-          <div className="flex min-h-0 min-w-0 flex-col select-none">
+          <div className="flex min-h-0 min-w-0 select-none flex-col">
             <div className="flex h-5 min-w-0 items-center gap-1">
               <Settings className="shrink-0" size={18} />
               <p className="shrink-0 text-sm font-bold">
@@ -210,14 +189,10 @@ export default function CreateTaskDialog() {
               />
 
               <div className="grid min-h-0 min-w-0 grid-cols-[clamp(180px,26%,256px)_minmax(0,1fr)] gap-3">
-                <ResizeCard />
-                <OutputCard
+                <ResizeSettingsCard />
+                <OutputSettingsCard
                   isSubmitting={ui.isSubmitting}
-                  canCreate={
-                    !ui.isSubmitting &&
-                    availableEncoderKinds.length > 0 &&
-                    availableEncoderKinds.includes(draft.activeEncoder)
-                  }
+                  canCreate={canCreate}
                   onCancel={discardAndClose}
                   onCreate={handleCreate}
                 />
@@ -240,498 +215,4 @@ export default function CreateTaskDialog() {
       </DialogContent>
     </Dialog>
   );
-}
-
-function ResizeCard() {
-  const { t } = useTranslation();
-  const snap = useSnapshot(createTaskDraft);
-  const resize = snap.resize;
-
-  function update(action: () => void) {
-    action();
-    markCreateTaskDirty();
-  }
-
-  return (
-    <div className="border rounded-lg flex flex-col gap-1 px-3 py-2">
-      <span className="flex justify-between items-center">
-        <p className="text-sm font-bold">{t("resize")}</p>
-        <Switch
-          size="sm"
-          checked={resize.enabled}
-          onCheckedChange={(checked) =>
-            update(() => {
-              createTaskDraft.resize.enabled = checked;
-            })
-          }
-        />
-      </span>
-      <CompactNumberField
-        label={t("width")}
-        value={resize.width}
-        disabled={!resize.enabled}
-        onChange={(value) =>
-          update(() => {
-            createTaskDraft.resize.width = value;
-          })
-        }
-      />
-      <CompactNumberField
-        label={t("height")}
-        value={resize.height}
-        disabled={!resize.enabled}
-        onChange={(value) =>
-          update(() => {
-            createTaskDraft.resize.height = value;
-          })
-        }
-      />
-      <div className="grid grid-cols-[minmax(0,1fr)_100px] items-center gap-2 text-xs">
-        <span className="text-right">{t("filter")}</span>
-        <Select
-          value={resize.filter}
-          disabled={!resize.enabled}
-          onValueChange={(value) =>
-            update(() => {
-              createTaskDraft.resize.filter = value as ResizeFilter;
-            })
-          }
-        >
-          <SelectTrigger size="sm" className="min-w-0 px-2 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="end" className="w-36 max-w-36">
-            <SelectItem value="nearest">Nearest</SelectItem>
-            <SelectItem value="bilinear">Bilinear</SelectItem>
-            <SelectItem value="hamming">Hamming</SelectItem>
-            <SelectItem value="catmull_rom">Catmull-Rom</SelectItem>
-            <SelectItem value="mitchell">Mitchell</SelectItem>
-            <SelectItem value="lanczos3">Lanczos3</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <CompactSwitch
-        label={t("allowUpscale")}
-        description={t("allowUpscaleDescription")}
-        checked={resize.allowUpscale}
-        disabled={!resize.enabled}
-        onCheckedChange={(checked) =>
-          update(() => {
-            createTaskDraft.resize.allowUpscale = checked;
-          })
-        }
-      />
-      <CompactSwitch
-        label={t("allowDownscale")}
-        description={t("allowDownscaleDescription")}
-        checked={resize.allowDownscale}
-        disabled={!resize.enabled}
-        onCheckedChange={(checked) =>
-          update(() => {
-            createTaskDraft.resize.allowDownscale = checked;
-          })
-        }
-      />
-    </div>
-  );
-}
-
-function OutputCard({
-  isSubmitting,
-  canCreate,
-  onCancel,
-  onCreate,
-}: {
-  isSubmitting: boolean;
-  canCreate: boolean;
-  onCancel: () => void;
-  onCreate: () => void | Promise<void>;
-}) {
-  const { t } = useTranslation();
-  const snap = useSnapshot(createTaskDraft);
-  const output = snap.output;
-  const isDirectory = output.locationMode === "directory";
-  const canBackup = output.collision === "replace";
-
-  function update(action: () => void) {
-    action();
-    markCreateTaskDirty();
-  }
-
-  async function ensureDesktopDefaultDirectory() {
-    if (createTaskDraft.output.outputDirectory.trim()) return;
-    try {
-      const path = await desktopDir();
-      if (
-        createTaskUiState.isOpen &&
-        !createTaskUiState.isSubmitting &&
-        !createTaskDraft.output.outputDirectory.trim()
-      ) {
-        createTaskDraft.output.outputDirectory = path;
-      }
-    } catch {
-      // Keep the field empty if the platform cannot resolve a desktop path.
-    }
-  }
-
-  async function handleSelectOutputDirectory() {
-    if (isSubmitting || !isDirectory) return;
-
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        defaultPath: output.outputDirectory || undefined,
-      });
-      // Ignore late results after submit/reset/close or cancel (null).
-      if (
-        !createTaskUiState.isOpen ||
-        createTaskUiState.isSubmitting ||
-        typeof selected !== "string"
-      ) {
-        return;
-      }
-
-      update(() => {
-        createTaskDraft.output.locationMode = "directory";
-        createTaskDraft.output.outputDirectory = selected;
-      });
-    } catch {
-      if (createTaskUiState.isOpen && !createTaskUiState.isSubmitting) {
-        createTaskUiState.globalError = t("createTaskErrorDirectoryPicker");
-      }
-    }
-  }
-
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5 rounded-lg border px-3 py-1.5">
-      <p className="text-sm font-bold">{t("output")}</p>
-      <div className="grid min-w-0 grid-cols-[clamp(7rem,14vw,8rem)_minmax(0,1fr)_max-content] gap-2">
-        <Select
-          value={output.locationMode}
-          disabled={isSubmitting}
-          onValueChange={(value) => {
-            const mode = value as "same_directory" | "directory";
-            update(() => {
-              createTaskDraft.output.locationMode = mode;
-            });
-            if (mode === "directory") {
-              void ensureDesktopDefaultDirectory();
-            }
-          }}
-        >
-          <SelectTrigger size="sm" className="px-2 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="same_directory">{t("sameDirectory")}</SelectItem>
-            <SelectItem value="directory">{t("customDirectory")}</SelectItem>
-          </SelectContent>
-        </Select>
-        <Input
-          value={output.outputDirectory}
-          disabled={!isDirectory || isSubmitting}
-          placeholder={t("outputDirectory")}
-          className="h-7 min-w-0 px-2 text-xs"
-          onChange={(event) =>
-            update(() => {
-              createTaskDraft.output.outputDirectory = event.target.value;
-            })
-          }
-        />
-        <Button
-          type="button"
-          variant="outline"
-          className="h-7 whitespace-nowrap px-2 text-xs"
-          disabled={!isDirectory || isSubmitting}
-          onClick={handleSelectOutputDirectory}
-        >
-          {t("selectDirectory")}
-        </Button>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex min-w-0 flex-col">
-          <span className="flex items-center gap-1 text-[0.7rem]">
-            <span>{t("collisionPolicy")}</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className="shrink-0 text-muted-foreground/70 transition-colors hover:text-foreground focus-visible:text-foreground"
-                  aria-label={t("collisionPolicyDescription")}
-                >
-                  <CircleHelp className="size-3" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent
-                side="top"
-                sideOffset={6}
-                className="max-w-64 leading-relaxed"
-              >
-                <p>{t("collisionPolicyDescription")}</p>
-              </TooltipContent>
-            </Tooltip>
-          </span>
-          <Select
-            value={output.collision}
-            onValueChange={(value) =>
-              update(() => {
-                const collision = value as CollisionPolicy;
-                createTaskDraft.output.collision = collision;
-                if (collision !== "replace") {
-                  createTaskDraft.output.sourceBackup = false;
-                  createTaskDraft.output.existingOutputBackup = false;
-                }
-              })
-            }
-          >
-            <SelectTrigger size="sm" className="px-2 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="fail">{t("collisionFail")}</SelectItem>
-              <SelectItem value="replace">{t("collisionReplace")}</SelectItem>
-              <SelectItem value="auto_rename">
-                {t("collisionAutoRename")}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <label className="flex min-w-0 flex-col text-[0.7rem]">
-          <span>{t("suffix")}</span>
-          <Input
-            value={output.suffix}
-            placeholder={t("suffix")}
-            className="h-7 px-2 text-xs"
-            onChange={(event) =>
-              update(() => {
-                createTaskDraft.output.suffix = event.target.value;
-              })
-            }
-          />
-        </label>
-      </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-        <CompactSwitch
-          label={t("preserveStructure")}
-          checked={output.preserveStructure}
-          disabled={!isDirectory}
-          onCheckedChange={(checked) =>
-            update(() => {
-              createTaskDraft.output.preserveStructure = checked;
-            })
-          }
-        />
-        <CompactSwitch
-          label={t("sourceBackup")}
-          checked={output.sourceBackup}
-          disabled={!canBackup}
-          onCheckedChange={(checked) =>
-            update(() => {
-              createTaskDraft.output.sourceBackup = checked;
-            })
-          }
-        />
-        <CompactSwitch
-          label={t("existingOutputBackup")}
-          checked={output.existingOutputBackup}
-          disabled={!canBackup}
-          onCheckedChange={(checked) =>
-            update(() => {
-              createTaskDraft.output.existingOutputBackup = checked;
-            })
-          }
-        />
-      </div>
-      <div className="mt-auto flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="h-7 min-w-14"
-          disabled={isSubmitting}
-          onClick={onCancel}
-        >
-          {t("cancel")}
-        </Button>
-        <Button
-          type="button"
-          className="h-7 min-w-14"
-          disabled={!canCreate}
-          onClick={onCreate}
-        >
-          {isSubmitting ? t("creatingTask") : t("create")}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function CompactNumberField({
-  label,
-  value,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  disabled: boolean;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="flex items-center gap-2 text-xs">
-      <span className="grow text-right">{label}</span>
-      <Input
-        type="number"
-        min={1}
-        value={value}
-        disabled={disabled}
-        className="h-7 w-20 px-1 text-right"
-        onChange={(event) => onChange(event.target.value)}
-      />
-      <span>px</span>
-    </label>
-  );
-}
-
-function CompactSwitch({
-  label,
-  description,
-  checked,
-  disabled = false,
-  onCheckedChange,
-}: {
-  label: string;
-  description?: string;
-  checked: boolean;
-  disabled?: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}) {
-  const switchId = useId();
-
-  return (
-    <div className="flex min-w-0 items-center justify-between gap-2 text-[0.7rem]">
-      <span className="flex min-w-0 items-center gap-1">
-        <label htmlFor={switchId} className="truncate">
-          {label}
-        </label>
-        {description && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                className="shrink-0 text-muted-foreground/70 transition-colors hover:text-foreground focus-visible:text-foreground"
-                aria-label={description}
-              >
-                <CircleHelp className="size-3" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent
-              side="top"
-              sideOffset={6}
-              className="max-w-64 leading-relaxed"
-            >
-              <p>{description}</p>
-            </TooltipContent>
-          </Tooltip>
-        )}
-      </span>
-      <Switch
-        id={switchId}
-        size="sm"
-        aria-label={label}
-        checked={checked}
-        disabled={disabled}
-        onCheckedChange={onCheckedChange}
-      />
-    </div>
-  );
-}
-
-function TaskCard({
-  fileName,
-  path,
-  disabled,
-  onRemove,
-}: {
-  fileName: string;
-  path: string;
-  disabled: boolean;
-  onRemove: (path: string) => void;
-}) {
-  return (
-    <div className="w-full h-7 px-2 py-1 grid grid-cols-[minmax(0,1fr)_20px] gap-1 hover:bg-slate-100">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <p className="w-full whitespace-nowrap overflow-hidden text-ellipsis text-sm">
-            {fileName}
-          </p>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{path}</p>
-        </TooltipContent>
-      </Tooltip>
-
-      <figure className="flex justify-center items-center">
-        <Button
-          type="button"
-          variant="ghost"
-          disabled={disabled}
-          className="p-0 m-0 h-full"
-          onClick={() => onRemove(path)}
-        >
-          <X
-            size={16}
-            className="text-muted-foreground/50 hover:text-muted-foreground"
-          />
-        </Button>
-      </figure>
-    </div>
-  );
-}
-
-function createTaskErrorMessage(
-  error: unknown,
-  t: (key: string) => string,
-): string {
-  if (error instanceof CreateTaskValidationError) {
-    const keyByCode: Record<CreateTaskValidationError["code"], string> = {
-      inputs_required: "createTaskErrorInputsRequired",
-      input_path_required: "createTaskErrorInputPath",
-      encoder_unsupported: "createTaskErrorEncoderUnsupported",
-      quality_invalid: "createTaskErrorQuality",
-      chroma_quality_invalid: "createTaskErrorChromaQuality",
-      smoothing_invalid: "createTaskErrorSmoothing",
-      chroma_subsample_invalid: "createTaskErrorChromaSubsample",
-      jpeg_quality_invalid: "createTaskErrorJpegQuality",
-      avif_quality_invalid: "createTaskErrorAvifQuality",
-      avif_alpha_quality_invalid: "createTaskErrorAvifAlphaQuality",
-      avif_speed_invalid: "createTaskErrorAvifSpeed",
-      oxipng_effort_invalid: "createTaskErrorOxiPngEffort",
-      webp_quality_invalid: "createTaskErrorWebPQuality",
-      webp_slight_loss_invalid: "createTaskErrorWebPSlightLoss",
-      webp_slight_loss_requires_lossless:
-        "createTaskErrorWebPSlightLossRequiresLossless",
-      resize_width_invalid: "createTaskErrorResizeWidth",
-      resize_height_invalid: "createTaskErrorResizeHeight",
-      output_directory_required: "createTaskErrorOutputDirectory",
-      suffix_invalid: "createTaskErrorSuffix",
-      backup_requires_replace: "createTaskErrorBackupPolicy",
-    };
-    return t(keyByCode[error.code]);
-  }
-
-  if (isRecord(error)) {
-    const appError = isRecord(error.error) ? error.error : error;
-    if (typeof appError.fallbackMessage === "string") {
-      return appError.fallbackMessage;
-    }
-    if (typeof appError.message === "string") return appError.message;
-  }
-  if (error instanceof Error && error.message) return error.message;
-  if (typeof error === "string") return error;
-  return t("createTaskErrorUnknown");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

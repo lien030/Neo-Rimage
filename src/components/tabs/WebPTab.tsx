@@ -1,25 +1,18 @@
 import {
   createTaskDraft,
-  markCreateTaskDirty,
+  updateCreateTaskDraft,
 } from "@/features/create-task";
 import { useTranslation } from "react-i18next";
 import { useSnapshot } from "valtio";
 
-import { EncoderPanel } from "./EncoderPanel";
+import { EncoderPanel, type EncoderTabProps } from "./EncoderPanel";
 import TabCard from "./TabCard";
 
 export default function WebPTab({
   extensions,
-}: {
-  extensions: readonly string[];
-}) {
+}: EncoderTabProps) {
   const { t } = useTranslation();
   const config = useSnapshot(createTaskDraft).webp;
-
-  function update(action: () => void) {
-    action();
-    markCreateTaskDirty();
-  }
 
   return (
     <EncoderPanel
@@ -30,11 +23,12 @@ export default function WebPTab({
         title={t("lossless")}
         variant="boolean"
         value={config.lossless}
-        onValueChange={(value) =>
-          update(() => {
-            const lossless = Boolean(value);
-            createTaskDraft.webp.lossless = lossless;
-            if (!lossless) createTaskDraft.webp.slightLoss = "0";
+        onValueChange={(lossless) =>
+          updateCreateTaskDraft((draft) => {
+            draft.webp.lossless = lossless;
+            if (!lossless) {
+              draft.webp.slightLoss = "0";
+            }
           })
         }
       />
@@ -45,8 +39,8 @@ export default function WebPTab({
         max={100}
         disabled={config.lossless}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.webp.quality = String(value);
+          updateCreateTaskDraft((draft) => {
+            draft.webp.quality = value;
           })
         }
       />
@@ -57,8 +51,8 @@ export default function WebPTab({
         max={100}
         disabled={!config.lossless}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.webp.slightLoss = String(value);
+          updateCreateTaskDraft((draft) => {
+            draft.webp.slightLoss = value;
           })
         }
       />
@@ -67,8 +61,8 @@ export default function WebPTab({
         variant="boolean"
         value={config.exact}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.webp.exact = Boolean(value);
+          updateCreateTaskDraft((draft) => {
+            draft.webp.exact = value;
           })
         }
       />

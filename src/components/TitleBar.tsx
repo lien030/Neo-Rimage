@@ -13,12 +13,23 @@ import {
   PinOff,
   X,
 } from "lucide-react";
-import { LanguageType } from "@/lib/type";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import i18n from "@/i18n/config";
+import i18n, {
+  LANGUAGE_STORAGE_KEY,
+  type SupportedLanguage,
+} from "@/i18n/config";
 import { useTranslation } from "react-i18next";
+
+const WINDOW_CONTROL_CLASS = "h-8 w-8 hover:bg-zinc-200/50";
+const WINDOW_ICON_COLOR = "#888888";
+
+const LANGUAGES: readonly { value: SupportedLanguage; label: string }[] = [
+  { value: "zh", label: "简体中文" },
+  { value: "ja", label: "日本語" },
+  { value: "en", label: "English" },
+];
 
 export default function TitleBar() {
   const { t } = useTranslation();
@@ -67,124 +78,115 @@ export default function TitleBar() {
     };
   }, []);
 
-  async function handleWindowClosed() {
+  async function handleClose() {
     await getCurrentWindow().close();
   }
 
-  async function handleWindowMinimize() {
+  async function handleMinimize() {
     await getCurrentWindow().minimize();
   }
 
-  async function handleWindowMaximize() {
+  async function handleToggleMaximize() {
     const appWindow = getCurrentWindow();
     await appWindow.toggleMaximize();
     setIsMaximized(await appWindow.isMaximized());
   }
 
-  function handleWindowPinned() {
-    setIsPinned(!isPinned);
+  function handleTogglePinned() {
+    setIsPinned((currentlyPinned) => !currentlyPinned);
   }
 
-  function updateLanguage(lang: LanguageType) {
-    localStorage.setItem("language", lang);
-    i18n.changeLanguage(lang);
+  function updateLanguage(lang: SupportedLanguage) {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+    void i18n.changeLanguage(lang);
   }
 
   return (
     <header
       data-tauri-drag-region="deep"
-      className="absolute top-0 h-14 w-full -mt-[1px] px-4 flex justify-between items-center select-none"
+      className="absolute top-0 -mt-[1px] flex h-14 w-full select-none items-center justify-between px-4"
     >
-      <p className="font-semibold text-lg text-primary">neo-rimage</p>
+      <p className="text-lg font-semibold text-primary">neo-rimage</p>
       <div className="flex gap-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="hover:bg-zinc-200/50 h-8 w-8"
+              className={WINDOW_CONTROL_CLASS}
               aria-label={languageLabel}
               title={languageLabel}
             >
-              <Languages color="#888888" size={20} />
+              <Languages color={WINDOW_ICON_COLOR} size={20} />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
             onCloseAutoFocus={(e) => e.preventDefault()}
           >
-            <DropdownMenuItem
-              onClick={() => {
-                updateLanguage("zh");
-              }}
-            >
-              简体中文
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                updateLanguage("ja");
-              }}
-            >
-              日本語
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                updateLanguage("en");
-              }}
-            >
-              English
-            </DropdownMenuItem>
+            {LANGUAGES.map((language) => (
+              <DropdownMenuItem
+                key={language.value}
+                onClick={() => updateLanguage(language.value)}
+              >
+                {language.label}
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="hover:bg-zinc-200/50 h-8 w-8"
-          onClick={handleWindowPinned}
-          aria-label={pinLabel}
-          title={pinLabel}
+        <WindowControlButton
+          label={pinLabel}
+          onClick={handleTogglePinned}
         >
           {isPinned ? (
-            <Pin size={18} color="#888888" />
+            <Pin size={18} color={WINDOW_ICON_COLOR} />
           ) : (
-            <PinOff size={18} color="#888888" />
+            <PinOff size={18} color={WINDOW_ICON_COLOR} />
           )}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="hover:bg-zinc-200/50 h-8 w-8"
-          onClick={handleWindowMinimize}
-          aria-label={minimizeLabel}
-          title={minimizeLabel}
+        </WindowControlButton>
+        <WindowControlButton
+          label={minimizeLabel}
+          onClick={handleMinimize}
         >
-          <Minus size={18} color="#888888" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="hover:bg-zinc-200/50 h-8 w-8"
-          onClick={handleWindowMaximize}
-          aria-label={maximizeLabel}
-          title={maximizeLabel}
+          <Minus size={18} color={WINDOW_ICON_COLOR} />
+        </WindowControlButton>
+        <WindowControlButton
+          label={maximizeLabel}
+          onClick={handleToggleMaximize}
         >
           {isMaximized ? (
-            <RestoreIcon size={17} color="#888888" />
+            <RestoreIcon size={17} color={WINDOW_ICON_COLOR} />
           ) : (
-            <Maximize2 size={18} color="#888888" />
+            <Maximize2 size={18} color={WINDOW_ICON_COLOR} />
           )}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="hover:bg-zinc-200/50 h-8 w-8"
-          onClick={handleWindowClosed}
-          aria-label={closeLabel}
-          title={closeLabel}
-        >
-          <X size={18} color="#888888" />
-        </Button>
+        </WindowControlButton>
+        <WindowControlButton label={closeLabel} onClick={handleClose}>
+          <X size={18} color={WINDOW_ICON_COLOR} />
+        </WindowControlButton>
       </div>
     </header>
+  );
+}
+
+function WindowControlButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void | Promise<void>;
+  children: ReactNode;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className={WINDOW_CONTROL_CLASS}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+    >
+      {children}
+    </Button>
   );
 }

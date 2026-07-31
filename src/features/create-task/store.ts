@@ -4,10 +4,10 @@ import type {
   CreateTaskFormValues,
   CreateTaskUiState,
 } from "./domain";
+import type { SelectedInputFile } from "./input-files";
 
 export function createDefaultCreateTaskForm(): CreateTaskFormValues {
   return {
-    inputs: [],
     activeEncoder: "mozjpeg",
     mozjpeg: {
       quality: "75",
@@ -75,6 +75,10 @@ export const createTaskDraft = proxy<CreateTaskFormValues>(
   createDefaultCreateTaskForm(),
 );
 
+export const createTaskInputState = proxy<{ files: SelectedInputFile[] }>({
+  files: [],
+});
+
 export const createTaskUiState = proxy<CreateTaskUiState>({
   isOpen: false,
   activeSection: "encoder",
@@ -88,8 +92,20 @@ export function markCreateTaskDirty(): void {
   createTaskUiState.globalError = null;
 }
 
+/** Keeps draft mutations and their UI bookkeeping on the same state boundary. */
+export function updateCreateTaskDraft(
+  update: (draft: CreateTaskFormValues) => void,
+): void {
+  update(createTaskDraft);
+  markCreateTaskDirty();
+}
+
 export function resetCreateTaskDraft(): void {
   Object.assign(createTaskDraft, createDefaultCreateTaskForm());
   createTaskUiState.isDirty = false;
   createTaskUiState.globalError = null;
+}
+
+export function resetCreateTaskInputs(): void {
+  createTaskInputState.files = [];
 }

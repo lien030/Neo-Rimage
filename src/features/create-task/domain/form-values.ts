@@ -1,23 +1,21 @@
 import type {
   AvifAlphaMode,
   AvifColorSpace,
+  CollisionPolicy,
+  ColorProfilePolicy,
+  EmbeddedMetadataPolicy,
   EncoderKind,
   InputAcceptancePolicy,
   MozJpegColorSpace,
   MozJpegQuantizationTable,
+  OutputLocation,
   ResizeFilter,
+  ResizeMode,
 } from "@/lib/ipc/contracts";
-
-export interface InputDraftValue {
-  localId: string;
-  path: string;
-  kind: "file" | "directory" | null;
-  scanRecursively: boolean;
-}
 
 export interface ResizeDraftValue {
   enabled: boolean;
-  mode: "exact" | "fit_width" | "fit_height" | "percentage" | "scale";
+  mode: ResizeMode["kind"];
   width: string;
   height: string;
   percent: string;
@@ -65,21 +63,18 @@ export interface WebPDraftValue {
 }
 
 export interface OutputDraftValue {
-  locationMode: "same_directory" | "directory";
+  locationMode: OutputLocation["kind"];
   outputDirectory: string;
   preserveStructure: boolean;
   suffix: string;
-  collision: "fail" | "replace" | "auto_rename";
+  collision: CollisionPolicy;
   sourceBackup: boolean;
   existingOutputBackup: boolean;
 }
 
 export interface MetadataDraftValue {
-  embedded: "preserve_when_supported" | "strip";
-  colorProfile:
-    | "preserve_when_supported"
-    | "convert_to_srgb"
-    | "strip_after_conversion";
+  embedded: EmbeddedMetadataPolicy;
+  colorProfile: ColorProfilePolicy;
   reportEnabled: boolean;
   reportPath: string;
 }
@@ -89,7 +84,6 @@ export interface MetadataDraftValue {
  * backend task snapshot or sent over IPC without validation/conversion.
  */
 export interface CreateTaskFormValues {
-  inputs: InputDraftValue[];
   activeEncoder: EncoderKind;
   mozjpeg: MozJpegDraftValue;
   jpeg: JpegDraftValue;

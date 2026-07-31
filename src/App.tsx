@@ -1,13 +1,3 @@
-import { useEffect } from "react";
-import { Button } from "./components/ui/button";
-import TitleBar from "./components/TitleBar";
-import {
-  appState,
-  taskState,
-  useAppState,
-  useBackendCommandState,
-  useBackendRuntimeState,
-} from "./lib/State";
 import { listen } from "@tauri-apps/api/event";
 import {
   CookingPot,
@@ -18,28 +8,42 @@ import {
   ScrollText,
   X,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+
+import CreateTaskDialog from "./CreateTaskDialog";
+import TaskTable from "./components/TaskTable";
+import TitleBar from "./components/TitleBar";
+import WorkerList from "./components/WorkerList";
+import { Button } from "./components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useTranslation } from "react-i18next";
-import TaskTable from "./components/TaskTable";
-import { createTaskList, fileFilter, mergeTask } from "./lib/appUtils";
-import WorkerList from "./components/WorkerList";
-import CreateTaskDialog from "./CreateTaskDialog";
+} from "./components/ui/dropdown-menu";
 import {
   formatBackendError,
   setSchedulerPaused,
   setWorkerCount,
+  useBackendCommandState,
+  useBackendRuntimeState,
   useBackendRuntimeSync,
-} from "@/features/backend";
-import { toast } from "sonner";
+} from "./features/backend";
+import {
+  collectImageInputs,
+  createTaskInputState,
+  createTaskUiState,
+  expandDroppedPaths,
+  mergeSelectedInputs,
+} from "./features/create-task";
+
+const SCAN_DROPPED_DIRECTORIES_RECURSIVELY = true;
 
 function App() {
   const { t } = useTranslation();
-  const app = useAppState();
+  const [dragOverlayVisible, setDragOverlayVisible] = useState(false);
   const backend = useBackendRuntimeState();
   const backendCommands = useBackendCommandState();
 
@@ -48,120 +52,96 @@ function App() {
   const scheduler = backend.snapshot?.scheduler;
   const schedulerRunning = scheduler?.mode === "running";
   const backendReady = backend.syncStatus === "ready" && scheduler !== undefined;
+  const schedulerStopState = backendReady && schedulerRunning;
   const minimumConcurrency = backend.capabilities?.concurrency.minimum ?? 1;
   const maximumConcurrency =
     backend.capabilities?.concurrency.maximum ?? scheduler?.maxConcurrency ?? 1;
+  const schedulerButtonLabel = !backendReady
+    ? "SYNC"
+    : schedulerStopState
+      ? "STOP"
+      : "GO";
 
   useEffect(() => {
-    const dragDrop = listen(
-      "tauri://drag-drop",
-      (e: { payload: { paths: string[] } }) => {
-        appState.isShowCreateTask = true;
-        appState.isShowDragDrop = false;
-        if (e.payload) {
-          handleDragDrop(e.payload.paths);
+    const listeners = [
+      listen(
+        "tauri://drag-drop",
+        (event: { payload: { paths: string[] } }) => {
+          createTaskUiState.isOpen = true;
+          setDragOverlayVisible(false);
+          if (event.payload) {
+            void handleDroppedPaths(event.payload.paths).catch(
+              (error: unknown) => {
+                toast.error("Unable to add dropped files", {
+                  description: formatBackendError(error),
+                });
+              },
+            );
+          }
+        },
+      ),
+      listen("tauri://drag-enter", () => {
+        if (!createTaskUiState.isOpen) {
+          setDragOverlayVisible(true);
         }
-      }
-    );
-    const dragEnter = listen("tauri://drag-enter", () => {
-      if (appState.isShowCreateTask) return;
-      appState.isShowDragDrop = true;
-    });
-    const dragLeave = listen("tauri://drag-leave", () => {
-      appState.isShowDragDrop = false;
-    });
+      }),
+      listen("tauri://drag-leave", () => {
+        setDragOverlayVisible(false);
+      }),
+    ];
 
     return () => {
-      dragDrop.then((unlisten) => {
-        unlisten();
-      });
-      dragEnter.then((dragEnter) => {
-        dragEnter();
-      });
-      dragLeave.then((dragLeave) => {
-        dragLeave();
+      // Listener registration is asynchronous, so cleanup must also handle
+      // registrations that resolve after this component has unmounted.
+      listeners.forEach((listener) => {
+        void listener.then((unlisten) => unlisten());
       });
     };
   }, []);
 
-  function DragDropActive() {
-    return (
-      <div className="absolute inset-x-0 bottom-0 top-14 z-20 bg-black/10 p-4">
-        <div className="relative flex h-full w-full flex-col items-center justify-center rounded-lg border-2 border-dashed bg-white p-4">
-          <Button
-            variant={"ghost"}
-            className="absolute right-2 top-2 px-2"
-            onClick={() => (appState.isShowDragDrop = false)}
-          >
-            <X size={24} className="text-muted-foreground" />
-          </Button>
-          <Download
-            className="text-muted-foreground"
-            size={36}
-            strokeWidth={1.6}
-          />
-          <p className="text-xl font-bold text-muted-foreground">Drop here </p>
-        </div>
-      </div>
+  function openCreateTaskDialog() {
+    createTaskUiState.isOpen = true;
+  }
+
+  async function handleDroppedPaths(paths: string[]) {
+    const filePaths = await expandDroppedPaths(
+      paths,
+      SCAN_DROPPED_DIRECTORIES_RECURSIVELY,
     );
+    const inputs = await collectImageInputs(filePaths);
+    createTaskInputState.files = mergeSelectedInputs(
+      createTaskInputState.files,
+      inputs,
+    );
+    createTaskUiState.isOpen = true;
   }
 
-  function handleInputFile() {
-    appState.isShowCreateTask = true;
-  }
-
-  async function handleDragDrop(paths: string[]) {
-    const filepaths = await fileFilter(paths, appState.recursiveFolders);
-    const tasklist = await createTaskList(filepaths);
-    taskState.taskCache = mergeTask(taskState.taskCache, tasklist);
-    appState.isShowCreateTask = true;
-  }
-
-  async function handleAddWorker() {
+  async function adjustWorkerCount(delta: -1 | 1) {
     if (!scheduler || backendCommands.workerCountPending) {
       return;
     }
 
-    const desired = Math.min(
-      scheduler.desiredConcurrency + 1,
-      maximumConcurrency,
-    );
-    if (desired === scheduler.desiredConcurrency) {
+    const desiredConcurrency =
+      delta > 0
+        ? Math.min(scheduler.desiredConcurrency + 1, maximumConcurrency)
+        : Math.max(scheduler.desiredConcurrency - 1, minimumConcurrency);
+    if (desiredConcurrency === scheduler.desiredConcurrency) {
       return;
     }
 
     try {
-      await setWorkerCount(desired);
+      await setWorkerCount(desiredConcurrency);
     } catch (error: unknown) {
-      toast.error("Unable to increase concurrency", {
-        description: formatBackendError(error),
-      });
+      toast.error(
+        delta > 0
+          ? "Unable to increase concurrency"
+          : "Unable to decrease concurrency",
+        { description: formatBackendError(error) },
+      );
     }
   }
 
-  async function handleRemoveWorker() {
-    if (!scheduler || backendCommands.workerCountPending) {
-      return;
-    }
-
-    const desired = Math.max(
-      scheduler.desiredConcurrency - 1,
-      minimumConcurrency,
-    );
-    if (desired === scheduler.desiredConcurrency) {
-      return;
-    }
-
-    try {
-      await setWorkerCount(desired);
-    } catch (error: unknown) {
-      toast.error("Unable to decrease concurrency", {
-        description: formatBackendError(error),
-      });
-    }
-  }
-
-  async function handleBreaker() {
+  async function handleToggleScheduler() {
     if (!scheduler || backendCommands.schedulerPending) {
       return;
     }
@@ -182,60 +162,30 @@ function App() {
         <div className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)_clamp(240px,30vw,360px)]">
           <div className="flex min-h-0 min-w-0 flex-col px-4 pb-4">
             <div className="flex h-9 shrink-0 justify-between">
-              <span className="flex gap-2 mx-2">
+              <span className="mx-2 flex gap-2">
                 <ScrollText
                   className="text-primary"
                   size={22}
                   strokeWidth={1.5}
                 />
-                <p className="text-primary font-bold tracking-wide">
+                <p className="font-bold tracking-wide text-primary">
                   {t("tasks")}
                 </p>
               </span>
-              <span className="flex gap-2 mx-2">
+              <span className="mx-2 flex gap-2">
                 <Button
-                  size={"icon"}
-                  onClick={handleInputFile}
-                  className="text-muted-foreground border h-7 w-12 rounded-lg"
+                  size="icon"
+                  onClick={openCreateTaskDialog}
+                  className="h-7 w-12 rounded-lg border text-muted-foreground"
                 >
                   <Plus size={16} className="text-white" />
                 </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      size={"icon"}
-                      disabled={!backendReady}
-                      className="text-muted-foreground bg-background hover:bg-muted-foreground/10 border h-7 w-12 rounded-lg"
-                    >
-                      <CookingPot size={16} />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem>
-                      <figure className="flex justify-center items-center">
-                        <div
-                          className="h-2 w-2 rounded-full bg-green-400"
-                        />
-                      </figure>
-                      <p className="mx-2">Success</p>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <figure className="flex justify-center items-center">
-                        <div
-                          className="h-2 w-2 rounded-full bg-red-400"
-                        />
-                      </figure>
-                      <p className="mx-2">Error</p>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem disabled>
-                      <p className="mx-4">ClearAll</p>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <JobStatusMenu disabled={!backendReady} />
               </span>
             </div>
             <TaskTable />
           </div>
+
           <div className="flex min-h-0 min-w-0 flex-col pb-4 pr-4">
             <div className="grid h-9 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-2">
               <span className="flex min-w-0 items-center gap-1 whitespace-nowrap">
@@ -244,7 +194,7 @@ function App() {
                   size={22}
                   strokeWidth={1.5}
                 />
-                <p className="truncate text-primary font-bold">
+                <p className="truncate font-bold text-primary">
                   {t("workers")}
                 </p>
                 {scheduler && (
@@ -258,7 +208,7 @@ function App() {
                 <Button
                   size="icon-sm"
                   className="size-7 rounded-lg border text-muted-foreground"
-                  onClick={handleAddWorker}
+                  onClick={() => void adjustWorkerCount(1)}
                   disabled={
                     !backendReady ||
                     backendCommands.workerCountPending ||
@@ -270,8 +220,8 @@ function App() {
                 </Button>
                 <Button
                   size="icon-sm"
-                  onClick={handleRemoveWorker}
                   className="size-7 rounded-lg border bg-background text-muted-foreground hover:bg-muted-foreground/10"
+                  onClick={() => void adjustWorkerCount(-1)}
                   disabled={
                     !backendReady ||
                     backendCommands.workerCountPending ||
@@ -287,32 +237,92 @@ function App() {
             <Button
               className={`mt-4 shrink-0 transition-all ${
                 schedulerRunning
-                  ? "bg-red-50 hover:bg-red-100 border border-red-600"
+                  ? "border border-red-600 bg-red-50 hover:bg-red-100"
                   : ""
               }`}
-              onClick={handleBreaker}
+              onClick={handleToggleScheduler}
               disabled={
                 !backendReady ||
                 backendCommands.schedulerPending ||
                 scheduler?.mode === "shutting_down"
               }
             >
-              {!backendReady && (
-                <p className="mx-2 font-bold text-lg">SYNC</p>
-              )}
-              {backendReady && !schedulerRunning && (
-                <p className="mx-2 font-bold text-lg">GO</p>
-              )}
-              {backendReady && schedulerRunning && (
-                <p className="mx-2 font-bold text-lg text-red-600">STOP</p>
-              )}
+              <p
+                className={`mx-2 text-lg font-bold ${
+                  schedulerStopState ? "text-red-600" : ""
+                }`}
+              >
+                {schedulerButtonLabel}
+              </p>
             </Button>
           </div>
         </div>
+
         <CreateTaskDialog />
-        {app.isShowDragDrop && <DragDropActive />}
+        {dragOverlayVisible && (
+          <DragDropOverlay
+            onDismiss={() => {
+              setDragOverlayVisible(false);
+            }}
+          />
+        )}
       </main>
       <TitleBar />
+    </div>
+  );
+}
+
+function JobStatusMenu({ disabled }: { disabled: boolean }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="icon"
+          disabled={disabled}
+          className="h-7 w-12 rounded-lg border bg-background text-muted-foreground hover:bg-muted-foreground/10"
+        >
+          <CookingPot size={16} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem>
+          <figure className="flex items-center justify-center">
+            <div className="h-2 w-2 rounded-full bg-green-400" />
+          </figure>
+          <p className="mx-2">Success</p>
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <figure className="flex items-center justify-center">
+            <div className="h-2 w-2 rounded-full bg-red-400" />
+          </figure>
+          <p className="mx-2">Error</p>
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <p className="mx-4">ClearAll</p>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function DragDropOverlay({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div className="absolute inset-x-0 bottom-0 top-14 z-20 bg-black/10 p-4">
+      <div className="relative flex h-full w-full flex-col items-center justify-center rounded-lg border-2 border-dashed bg-white p-4">
+        <Button
+          variant="ghost"
+          className="absolute right-2 top-2 px-2"
+          onClick={onDismiss}
+        >
+          <X size={24} className="text-muted-foreground" />
+        </Button>
+        <Download
+          className="text-muted-foreground"
+          size={36}
+          strokeWidth={1.6}
+        />
+        <p className="text-xl font-bold text-muted-foreground">Drop here </p>
+      </div>
     </div>
   );
 }

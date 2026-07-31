@@ -1,25 +1,18 @@
 import {
   createTaskDraft,
-  markCreateTaskDirty,
+  updateCreateTaskDraft,
 } from "@/features/create-task";
 import { useTranslation } from "react-i18next";
 import { useSnapshot } from "valtio";
 
-import { EncoderPanel } from "./EncoderPanel";
+import { EncoderPanel, type EncoderTabProps } from "./EncoderPanel";
 import TabCard from "./TabCard";
 
 export default function JpegTab({
   extensions,
-}: {
-  extensions: readonly string[];
-}) {
+}: EncoderTabProps) {
   const { t } = useTranslation();
   const config = useSnapshot(createTaskDraft).jpeg;
-
-  function update(action: () => void) {
-    action();
-    markCreateTaskDirty();
-  }
 
   return (
     <EncoderPanel
@@ -32,8 +25,8 @@ export default function JpegTab({
         min={1}
         max={100}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.jpeg.quality = String(value);
+          updateCreateTaskDraft((draft) => {
+            draft.jpeg.quality = value;
           })
         }
       />
@@ -42,8 +35,8 @@ export default function JpegTab({
         variant="boolean"
         value={config.progressive}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.jpeg.progressive = Boolean(value);
+          updateCreateTaskDraft((draft) => {
+            draft.jpeg.progressive = value;
           })
         }
       />

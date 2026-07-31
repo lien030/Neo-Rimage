@@ -1,19 +1,25 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Lightbulb, SlidersHorizontal } from "lucide-react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+
+export interface EncoderTabProps {
+  extensions: readonly string[];
+}
+
+interface EncoderPanelProps extends EncoderTabProps {
+  description: string;
+  fillContent?: boolean;
+  children: ReactNode;
+}
 
 export function EncoderPanel({
   description,
   extensions,
   fillContent = false,
   children,
-}: {
-  description: string;
-  extensions: readonly string[];
-  fillContent?: boolean;
-  children: React.ReactNode;
-}) {
+}: EncoderPanelProps) {
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-1">
       <div className="mx-2 flex h-5 min-w-0 items-center gap-1">
@@ -56,7 +62,7 @@ export function OptionlessEncoderPanel({
   extensions,
 }: {
   description: string;
-  extensions: readonly string[];
+  extensions: EncoderTabProps["extensions"];
 }) {
   const { t } = useTranslation();
 

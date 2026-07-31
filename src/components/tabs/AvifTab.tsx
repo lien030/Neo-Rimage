@@ -7,27 +7,20 @@ import {
 } from "@/components/ui/select";
 import {
   createTaskDraft,
-  markCreateTaskDirty,
+  updateCreateTaskDraft,
 } from "@/features/create-task";
 import type { AvifAlphaMode, AvifColorSpace } from "@/lib/ipc/contracts";
 import { useTranslation } from "react-i18next";
 import { useSnapshot } from "valtio";
 
-import { EncoderPanel } from "./EncoderPanel";
+import { EncoderPanel, type EncoderTabProps } from "./EncoderPanel";
 import TabCard from "./TabCard";
 
 export default function AvifTab({
   extensions,
-}: {
-  extensions: readonly string[];
-}) {
+}: EncoderTabProps) {
   const { t } = useTranslation();
   const config = useSnapshot(createTaskDraft).avif;
-
-  function update(action: () => void) {
-    action();
-    markCreateTaskDirty();
-  }
 
   return (
     <EncoderPanel
@@ -40,8 +33,8 @@ export default function AvifTab({
         min={1}
         max={100}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.avif.quality = String(value);
+          updateCreateTaskDraft((draft) => {
+            draft.avif.quality = value;
           })
         }
       />
@@ -52,8 +45,8 @@ export default function AvifTab({
         min={1}
         max={100}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.avif.alphaQuality = String(value);
+          updateCreateTaskDraft((draft) => {
+            draft.avif.alphaQuality = value;
           })
         }
       />
@@ -63,8 +56,8 @@ export default function AvifTab({
         min={1}
         max={10}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.avif.speed = String(value);
+          updateCreateTaskDraft((draft) => {
+            draft.avif.speed = value;
           })
         }
       />
@@ -72,8 +65,8 @@ export default function AvifTab({
         <Select
           value={config.colorSpace}
           onValueChange={(value: AvifColorSpace) =>
-            update(() => {
-              createTaskDraft.avif.colorSpace = value;
+            updateCreateTaskDraft((draft) => {
+              draft.avif.colorSpace = value;
             })
           }
         >
@@ -90,8 +83,8 @@ export default function AvifTab({
         <Select
           value={config.alphaMode}
           onValueChange={(value: AvifAlphaMode) =>
-            update(() => {
-              createTaskDraft.avif.alphaMode = value;
+            updateCreateTaskDraft((draft) => {
+              draft.avif.alphaMode = value;
             })
           }
         >

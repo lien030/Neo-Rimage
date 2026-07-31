@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { type CSSProperties, useMemo } from "react";
 import {
   type ColumnDef,
   flexRender,
@@ -20,7 +20,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useBackendRuntimeState } from "@/lib/State";
+import { useBackendRuntimeState } from "@/features/backend";
 import type { JobStatus } from "@/lib/ipc";
 
 type ObservedBackendState = ReturnType<typeof useBackendRuntimeState>;
@@ -34,25 +34,40 @@ interface DataTableProps<TData, TValue> {
   emptyMessage: string;
 }
 
-function lampColor(status: JobStatus) {
-  switch (status) {
-    case "queued":
-      return "bg-gray-400";
-    case "running":
-      return "bg-yellow-400";
-    case "paused":
-      return "bg-blue-400";
-    case "cancelling":
-      return "bg-orange-400";
-    case "succeeded":
-      return "bg-green-400";
-    case "partially_succeeded":
-      return "bg-amber-500";
-    case "failed":
-      return "bg-red-400";
-    case "cancelled":
-      return "bg-zinc-500";
-  }
+const STATUS_LAMP_CLASSES: Record<JobStatus, string> = {
+  queued: "bg-gray-400",
+  running: "bg-yellow-400",
+  paused: "bg-blue-400",
+  cancelling: "bg-orange-400",
+  succeeded: "bg-green-400",
+  partially_succeeded: "bg-amber-500",
+  failed: "bg-red-400",
+  cancelled: "bg-zinc-500",
+};
+
+const EMPTY_JOBS: readonly ObservedJobSnapshot[] = [];
+
+interface SizedColumn {
+  id: string;
+  getSize: () => number;
+  columnDef: { minSize?: number };
+}
+
+function columnLayout(column: SizedColumn): {
+  className?: string;
+  style: CSSProperties;
+} {
+  const isStatusColumn = column.id === "status";
+  const fixedWidth = isStatusColumn ? column.getSize() : undefined;
+
+  return {
+    className: isStatusColumn ? "w-8 px-1" : undefined,
+    style: {
+      width: fixedWidth,
+      minWidth: column.columnDef.minSize,
+      maxWidth: fixedWidth,
+    },
+  };
 }
 
 function statusLabel(status: JobStatus) {
@@ -62,12 +77,7 @@ function statusLabel(status: JobStatus) {
     .join(" ");
 }
 
-function jobProgress(job: {
-  readonly progress: {
-    readonly completedItems: number;
-    readonly totalItems: number;
-  };
-}) {
+function jobProgress(job: ObservedJobSnapshot) {
   if (job.progress.totalItems === 0) {
     return "—";
   }
@@ -101,6 +111,7 @@ function DataTable<TData, TValue>({
       (width, column) => width + (column.columnDef.minSize ?? 0),
       0,
     );
+  const rows = table.getRowModel().rows;
 
   return (
     <Table
@@ -112,19 +123,13 @@ function DataTable<TData, TValue>({
         {table.getHeaderGroups().map((headerGroup) => (
           <TableRow key={headerGroup.id}>
             {headerGroup.headers.map((header) => {
-              const isStatusColumn = header.column.id === "status";
+              const layout = columnLayout(header.column);
 
               return (
                 <TableHead
                   key={header.id}
-                  className={isStatusColumn ? "w-8 px-1" : undefined}
-                  style={{
-                    width: isStatusColumn ? header.column.getSize() : undefined,
-                    minWidth: header.column.columnDef.minSize,
-                    maxWidth: isStatusColumn
-                      ? header.column.getSize()
-                      : undefined,
-                  }}
+                  className={layout.className}
+                  style={layout.style}
                 >
                   {header.isPlaceholder
                     ? null
@@ -139,23 +144,17 @@ function DataTable<TData, TValue>({
         ))}
       </TableHeader>
       <TableBody>
-        {table.getRowModel().rows.length ? (
-          table.getRowModel().rows.map((row) => (
+        {rows.length ? (
+          rows.map((row) => (
             <TableRow key={row.id}>
               {row.getVisibleCells().map((cell) => {
-                const isStatusColumn = cell.column.id === "status";
+                const layout = columnLayout(cell.column);
 
                 return (
                   <TableCell
                     key={cell.id}
-                    className={isStatusColumn ? "w-8 px-1" : undefined}
-                    style={{
-                      width: isStatusColumn ? cell.column.getSize() : undefined,
-                      minWidth: cell.column.columnDef.minSize,
-                      maxWidth: isStatusColumn
-                        ? cell.column.getSize()
-                        : undefined,
-                    }}
+                    className={layout.className}
+                    style={layout.style}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
@@ -178,10 +177,7 @@ function DataTable<TData, TValue>({
 export default function TaskTable() {
   const { t } = useTranslation();
   const backend = useBackendRuntimeState();
-  const jobs = useMemo(
-    () => (backend.snapshot ? [...backend.snapshot.jobs] : []),
-    [backend.snapshot],
-  );
+  const jobs = backend.snapshot?.jobs ?? EMPTY_JOBS;
 
   const columns = useMemo<ColumnDef<ObservedJobSnapshot>[]>(
     () => [
@@ -193,7 +189,7 @@ export default function TaskTable() {
         cell: ({ row }) => (
           <figure className="flex justify-center items-center">
             <div
-              className={`h-2 w-2 rounded-full ${lampColor(row.original.status)}`}
+              className={`h-2 w-2 rounded-full ${STATUS_LAMP_CLASSES[row.original.status]}`}
             />
           </figure>
         ),

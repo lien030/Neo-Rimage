@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/select";
 import {
   createTaskDraft,
-  markCreateTaskDirty,
+  updateCreateTaskDraft,
 } from "@/features/create-task";
 import type {
   MozJpegColorSpace,
@@ -16,7 +16,7 @@ import type {
 import { useTranslation } from "react-i18next";
 import { useSnapshot } from "valtio";
 
-import { EncoderPanel } from "./EncoderPanel";
+import { EncoderPanel, type EncoderTabProps } from "./EncoderPanel";
 import TabCard from "./TabCard";
 
 const QUANTIZATION_TABLES: readonly {
@@ -36,17 +36,9 @@ const QUANTIZATION_TABLES: readonly {
 
 export default function MozjpegTab({
   extensions,
-}: {
-  extensions: readonly string[];
-}) {
+}: EncoderTabProps) {
   const { t } = useTranslation();
-  const snap = useSnapshot(createTaskDraft);
-  const config = snap.mozjpeg;
-
-  function update(action: () => void) {
-    action();
-    markCreateTaskDirty();
-  }
+  const config = useSnapshot(createTaskDraft).mozjpeg;
 
   return (
     <EncoderPanel
@@ -59,8 +51,8 @@ export default function MozjpegTab({
         min={1}
         max={100}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.mozjpeg.quality = String(value);
+          updateCreateTaskDraft((draft) => {
+            draft.mozjpeg.quality = value;
           })
         }
       />
@@ -71,8 +63,8 @@ export default function MozjpegTab({
         min={1}
         max={100}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.mozjpeg.chromaQuality = String(value);
+          updateCreateTaskDraft((draft) => {
+            draft.mozjpeg.chromaQuality = value;
           })
         }
       />
@@ -82,8 +74,8 @@ export default function MozjpegTab({
         min={0}
         max={100}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.mozjpeg.smoothing = String(value);
+          updateCreateTaskDraft((draft) => {
+            draft.mozjpeg.smoothing = value;
           })
         }
       />
@@ -92,8 +84,8 @@ export default function MozjpegTab({
         variant="boolean"
         value={config.progressive}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.mozjpeg.progressive = Boolean(value);
+          updateCreateTaskDraft((draft) => {
+            draft.mozjpeg.progressive = value;
           })
         }
       />
@@ -102,8 +94,8 @@ export default function MozjpegTab({
         variant="boolean"
         value={config.optimizeCoding}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.mozjpeg.optimizeCoding = Boolean(value);
+          updateCreateTaskDraft((draft) => {
+            draft.mozjpeg.optimizeCoding = value;
           })
         }
       />
@@ -112,8 +104,8 @@ export default function MozjpegTab({
         variant="boolean"
         value={config.trellisMultipass}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.mozjpeg.trellisMultipass = Boolean(value);
+          updateCreateTaskDraft((draft) => {
+            draft.mozjpeg.trellisMultipass = value;
           })
         }
       />
@@ -121,8 +113,8 @@ export default function MozjpegTab({
         <Select
           value={config.colorSpace}
           onValueChange={(value: MozJpegColorSpace) =>
-            update(() => {
-              createTaskDraft.mozjpeg.colorSpace = value;
+            updateCreateTaskDraft((draft) => {
+              draft.mozjpeg.colorSpace = value;
             })
           }
         >
@@ -143,8 +135,8 @@ export default function MozjpegTab({
         min={1}
         max={4}
         onValueChange={(value) =>
-          update(() => {
-            createTaskDraft.mozjpeg.chromaSubsample = String(value);
+          updateCreateTaskDraft((draft) => {
+            draft.mozjpeg.chromaSubsample = value;
           })
         }
       />
@@ -152,8 +144,8 @@ export default function MozjpegTab({
         <Select
           value={config.quantizationTable ?? "default"}
           onValueChange={(value) =>
-            update(() => {
-              createTaskDraft.mozjpeg.quantizationTable =
+            updateCreateTaskDraft((draft) => {
+              draft.mozjpeg.quantizationTable =
                 value === "default"
                   ? null
                   : (value as MozJpegQuantizationTable);
