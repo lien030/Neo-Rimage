@@ -46,9 +46,10 @@ export interface IpcTransport {
 }
 
 const tauriTransport: IpcTransport = {
-  invoke: (command, args) => invoke(command, args),
-  listen: (event, handler) =>
-    listen(event, ({ payload }) => handler(payload as never)),
+  invoke: <T>(command: string, args?: Record<string, unknown>) =>
+    invoke<T>(command, args),
+  listen: <T>(event: string, handler: (payload: T) => void) =>
+    listen<T>(event, ({ payload }) => handler(payload)),
 };
 
 export class BackendClient {
@@ -119,6 +120,8 @@ export function createJobCommand(
 ): CreateJobCommand {
   return {
     correlationId,
+    // Normalize the version at the final IPC boundary so callers cannot send
+    // a stale version copied from long-lived editable state.
     request: { ...request, schemaVersion: IPC_SCHEMA_VERSION },
   };
 }

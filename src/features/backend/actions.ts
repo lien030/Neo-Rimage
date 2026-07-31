@@ -1,57 +1,61 @@
 import {
   backendClient,
+  generateCorrelationId,
   IPC_SCHEMA_VERSION,
   type BackendSnapshot,
+  type Revision,
 } from "@/lib/ipc";
 import {
   backendCommandState,
   refreshBackendSnapshot,
 } from "./runtime";
 
-function correlationId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+type PendingCommand = "schedulerPending" | "workerCountPending";
+
+interface RevisionedCommandResponse {
+  readonly revision: Revision;
+}
+
+async function runBackendCommand(
+  pendingCommand: PendingCommand,
+  send: () => Promise<RevisionedCommandResponse>,
+): Promise<BackendSnapshot> {
+  if (backendCommandState[pendingCommand]) {
+    return refreshBackendSnapshot();
   }
 
-  return `request-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  backendCommandState[pendingCommand] = true;
+  try {
+    const response = await send();
+
+    // The acknowledgement may arrive before the corresponding snapshot is
+    // observable, so wait for at least the acknowledged backend revision.
+    return await refreshBackendSnapshot(response.revision);
+  } finally {
+    backendCommandState[pendingCommand] = false;
+  }
 }
 
 export async function setSchedulerPaused(
   paused: boolean,
 ): Promise<BackendSnapshot> {
-  if (backendCommandState.schedulerPending) {
-    return refreshBackendSnapshot();
-  }
-
-  backendCommandState.schedulerPending = true;
-  try {
-    await backendClient.setSchedulerPaused({
+  return runBackendCommand("schedulerPending", () =>
+    backendClient.setSchedulerPaused({
       schemaVersion: IPC_SCHEMA_VERSION,
-      correlationId: correlationId(),
+      correlationId: generateCorrelationId("request"),
       paused,
-    });
-    return await refreshBackendSnapshot();
-  } finally {
-    backendCommandState.schedulerPending = false;
-  }
+    }),
+  );
 }
 
 export async function setWorkerCount(
   desiredConcurrency: number,
 ): Promise<BackendSnapshot> {
-  if (backendCommandState.workerCountPending) {
-    return refreshBackendSnapshot();
-  }
-
-  backendCommandState.workerCountPending = true;
-  try {
-    await backendClient.setWorkerCount({
+  return runBackendCommand("workerCountPending", () =>
+    backendClient.setWorkerCount({
       schemaVersion: IPC_SCHEMA_VERSION,
-      correlationId: correlationId(),
+      correlationId: generateCorrelationId("request"),
       desiredConcurrency,
-    });
-    return await refreshBackendSnapshot();
-  } finally {
-    backendCommandState.workerCountPending = false;
-  }
+    }),
+  );
 }

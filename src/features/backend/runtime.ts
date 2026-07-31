@@ -5,25 +5,22 @@ import { toast } from "sonner";
 
 import {
   backendClient,
+  classifyRevision,
   IPC_SCHEMA_VERSION,
   type BackendCapabilities,
   type BackendSnapshot,
+  type BackendSyncStatus,
+  type Revision,
   type StateEventEnvelope,
 } from "@/lib/ipc";
-import { classifyRevision } from "@/lib/ipc/revision";
 
-export type BackendSyncStatus =
-  | "idle"
-  | "syncing"
-  | "ready"
-  | "needs_resync"
-  | "unavailable";
+export type { BackendSyncStatus } from "@/lib/ipc";
 
 interface BackendRuntimeState {
   capabilities: BackendCapabilities | null;
   snapshot: BackendSnapshot | null;
   syncStatus: BackendSyncStatus;
-  lastAppliedRevision: number;
+  lastAppliedRevision: Revision;
   lastError: string | null;
 }
 
@@ -55,9 +52,9 @@ export function useBackendCommandState() {
 
 let snapshotRequest: Promise<BackendSnapshot> | null = null;
 let capabilitiesRequest: Promise<BackendCapabilities> | null = null;
-let requestedRevision = 0;
+let requestedRevision: Revision = 0;
 
-function assertSchemaVersion(schemaVersion: number, source: string) {
+function assertSchemaVersion(schemaVersion: number, source: string): void {
   if (schemaVersion !== IPC_SCHEMA_VERSION) {
     throw new Error(
       `${source} uses unsupported schema version ${schemaVersion}.`,
@@ -65,12 +62,12 @@ function assertSchemaVersion(schemaVersion: number, source: string) {
   }
 }
 
-function applyCapabilities(capabilities: BackendCapabilities) {
+function applyCapabilities(capabilities: BackendCapabilities): void {
   assertSchemaVersion(capabilities.schemaVersion, "Backend capabilities");
   backendRuntimeState.capabilities = capabilities;
 }
 
-function applySnapshot(snapshot: BackendSnapshot) {
+function applySnapshot(snapshot: BackendSnapshot): void {
   assertSchemaVersion(snapshot.schemaVersion, "Backend snapshot");
   if (snapshot.revision < backendRuntimeState.lastAppliedRevision) {
     return;
@@ -101,9 +98,15 @@ export async function refreshBackendCapabilities(): Promise<BackendCapabilities>
 export async function refreshBackendSnapshot(
   minimumRevision = 0,
 ): Promise<BackendSnapshot> {
-  requestedRevision = Math.max(requestedRevision, minimumRevision);
+  requestedRevision = Math.max(
+    requestedRevision,
+    backendRuntimeState.lastAppliedRevision,
+    minimumRevision,
+  );
 
   if (!snapshotRequest) {
+    // Coalesce concurrent refreshes while still honoring the highest revision
+    // requested by an event or command acknowledgement.
     snapshotRequest = (async () => {
       while (true) {
         const snapshot = await backendClient.getSnapshot();
@@ -120,7 +123,7 @@ export async function refreshBackendSnapshot(
   return snapshotRequest;
 }
 
-async function handleStateEvent(event: StateEventEnvelope) {
+async function handleStateEvent(event: StateEventEnvelope): Promise<void> {
   assertSchemaVersion(event.schemaVersion, "Backend state event");
 
   const relation = classifyRevision(
@@ -162,7 +165,18 @@ export function formatBackendError(error: unknown): string {
   return "The backend request failed.";
 }
 
-export function useBackendRuntimeSync() {
+function reportBackendError(
+  syncStatus: BackendSyncStatus,
+  title: string,
+  error: unknown,
+): void {
+  const message = formatBackendError(error);
+  backendRuntimeState.syncStatus = syncStatus;
+  backendRuntimeState.lastError = message;
+  toast.error(title, { description: message });
+}
+
+export function useBackendRuntimeSync(): void {
   useEffect(() => {
     let disposed = false;
     let unlisten: UnlistenFn | null = null;
@@ -180,12 +194,11 @@ export function useBackendRuntimeSync() {
           if (disposed) {
             return;
           }
-          const message = formatBackendError(error);
-          backendRuntimeState.syncStatus = "needs_resync";
-          backendRuntimeState.lastError = message;
-          toast.error("Backend synchronization failed", {
-            description: message,
-          });
+          reportBackendError(
+            "needs_resync",
+            "Backend synchronization failed",
+            error,
+          );
         });
       });
 
@@ -205,10 +218,7 @@ export function useBackendRuntimeSync() {
       if (disposed) {
         return;
       }
-      const message = formatBackendError(error);
-      backendRuntimeState.syncStatus = "unavailable";
-      backendRuntimeState.lastError = message;
-      toast.error("Backend unavailable", { description: message });
+      reportBackendError("unavailable", "Backend unavailable", error);
     });
 
     return () => {

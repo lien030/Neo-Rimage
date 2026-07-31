@@ -1,3 +1,8 @@
+/**
+ * JSON wire contract shared with the Rust backend. Field names and string
+ * discriminants are protocol values; changing them requires a matching backend
+ * change and, when incompatible, a schema-version bump.
+ */
 export const IPC_SCHEMA_VERSION = 1 as const;
 export const JOB_CONFIG_VERSION = 1 as const;
 
@@ -11,6 +16,8 @@ export type TimestampMs = number;
 
 export type InputResourceKind = "file" | "directory";
 export type InputAcceptancePolicy = "reject_all" | "accept_valid";
+
+// Job creation configuration.
 
 export interface InputResource {
   path: string;
@@ -177,6 +184,8 @@ export interface CreateJobRequest {
   inputAcceptance: InputAcceptancePolicy;
   scheduling: SchedulingHint | null;
 }
+
+// Runtime progress and read-only backend snapshots.
 
 export type ProcessingStage =
   | "preflight"
@@ -396,6 +405,8 @@ export interface JobDetailSnapshot {
   readonly items: Page<ItemSnapshot>;
 }
 
+// Commands and command responses.
+
 export interface CreateJobCommand {
   correlationId: CorrelationId;
   request: CreateJobRequest;
@@ -446,6 +457,9 @@ export interface CommandAccepted<T> {
   readonly snapshot: T;
 }
 
+// Revisioned push events. Consumers use these as invalidation hints and fetch
+// an authoritative snapshot rather than merging partial payloads in place.
+
 export type StateEvent =
   | { kind: "snapshot_invalidated" }
   | { kind: "scheduler_changed"; payload: SchedulerSnapshot }
@@ -484,6 +498,8 @@ export interface NoticeEventEnvelope {
   readonly occurredAt: TimestampMs;
   readonly notice: BackendNotice;
 }
+
+// Capability discovery metadata used to constrain editable frontend options.
 
 export type JsonValue =
   | null
