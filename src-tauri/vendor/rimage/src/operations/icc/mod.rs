@@ -10,6 +10,12 @@ use zune_image::{
 
 /// Apply icc profile
 pub struct ApplyICC {
+    // The Mutex is broader than the single `&profile` borrow `Transform::new`
+    // needs, but lcms2's `Transform<'a>` is lifetime-bound to the profiles
+    // it was built from, so the guard cannot be released while the transform
+    // is alive. In this program each worker constructs its own `ApplySRGB`
+    // instance, so the lock is never contended; it exists only so a shared
+    // instance stays sound across threads.
     profile: Mutex<Profile<GlobalContext>>,
 }
 
@@ -85,10 +91,34 @@ impl OperationsTrait for ApplyICC {
         )
         .map_err(|e| ImageOperationsErrors::GenericString(e.to_string()))?;
 
+        let bit_type = image.depth().bit_type();
         for frame in image.frames_mut() {
-            let mut buffer = frame.flatten::<u8>();
-            t.transform_in_place(&mut buffer);
-            let _ = std::mem::replace(frame, Frame::from_u8(&buffer, colorspace, 0, 0));
+            let numerator = frame.numerator();
+            let denominator = frame.denominator();
+
+            match bit_type {
+                BitType::U8 => {
+                    let mut buffer = frame.flatten::<u8>();
+                    t.transform_in_place(&mut buffer);
+                    *frame = Frame::from_u8(&buffer, colorspace, numerator, denominator);
+                }
+                BitType::U16 => {
+                    let mut bytes = frame.u16_to_native_endian();
+                    t.transform_in_place(&mut bytes);
+                    let samples = bytes
+                        .as_chunks::<2>()
+                        .0
+                        .iter()
+                        .map(|sample| u16::from_ne_bytes([sample[0], sample[1]]))
+                        .collect::<Vec<_>>();
+                    *frame = Frame::from_u16(&samples, colorspace, numerator, denominator);
+                }
+                bit_type => {
+                    return Err(ImageErrors::OperationsError(
+                        ImageOperationsErrors::UnsupportedType(self.name(), bit_type),
+                    ));
+                }
+            }
         }
 
         image.metadata_mut().set_icc_chunk(
@@ -130,7 +160,9 @@ impl OperationsTrait for ApplySRGB {
 
     fn execute_impl(&self, image: &mut Image) -> Result<(), ImageErrors> {
         if image.metadata().icc_chunk().is_none() {
-            log::warn!("No icc profile in the image, skipping");
+            // Routine path for images without an embedded profile, so this is
+            // debug-level to stay quiet under the default warn-level logging.
+            log::debug!("No icc profile in the image, skipping");
             return Ok(());
         }
 

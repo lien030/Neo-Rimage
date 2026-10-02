@@ -42,6 +42,14 @@ impl EncoderTrait for OxiPngEncoder {
     ) -> Result<usize, ImageErrors> {
         let (width, height) = image.dimensions();
 
+        // PNG stores dimensions as 32-bit; `width as u32` would silently
+        // truncate on a hypothetical >4 Gpx image and hand oxipng wrong
+        // dimensions with the full buffer. Reject it instead.
+        let (width_u32, height_u32) = (
+            u32::try_from(width).map_err(|_| dimension_overflow(width, height))?,
+            u32::try_from(height).map_err(|_| dimension_overflow(width, height))?,
+        );
+
         if image.is_animated() {
             log::warn!(
                 "OxiPNG does not support animated images, only the first frame will be encoded"
@@ -49,14 +57,14 @@ impl EncoderTrait for OxiPngEncoder {
         }
 
         // inlined `to_u8` method because its private
-        let _colorspace = image.colorspace();
+        let colorspace = image.colorspace();
         let data = if image.depth() == BitDepth::Eight {
             image.flatten_frames::<u8>()
         } else if image.depth() == BitDepth::Sixteen {
             image
                 .frames_ref()
                 .iter()
-                .map(|z| z.u16_to_native_endian())
+                .map(|frame| frame.u16_to_big_endian(colorspace))
                 .collect()
         } else {
             return Err(ImageErrors::EncodeErrors(ImgEncodeErrors::Generic(
@@ -65,12 +73,16 @@ impl EncoderTrait for OxiPngEncoder {
         }
         .into_iter()
         .next()
-        .unwrap();
+        .ok_or({
+            ImageErrors::EncodeErrors(ImgEncodeErrors::GenericStatic(
+                "Cannot encode an image with no frames",
+            ))
+        })?;
 
         #[allow(unused_mut)]
         let mut img = oxipng::RawImage::new(
-            width as u32,
-            height as u32,
+            width_u32,
+            height_u32,
             match image.colorspace() {
                 ColorSpace::Luma => oxipng::ColorType::Grayscale {
                     transparent_shade: None,
@@ -146,6 +158,13 @@ impl EncoderTrait for OxiPngEncoder {
             _ => BitDepth::Eight,
         }
     }
+}
+
+/// Build the encode error for a dimension that does not fit in PNG's u32.
+fn dimension_overflow(width: usize, height: usize) -> ImageErrors {
+    ImageErrors::EncodeErrors(ImgEncodeErrors::ImageEncodeErrors(format!(
+        "image dimensions {width}x{height} exceed the PNG u32 limit"
+    )))
 }
 
 #[cfg(test)]

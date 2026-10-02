@@ -1,71 +1,60 @@
-extern crate winres;
-use std::env;
-use winres::VersionInfo;
+use winresource::{VersionInfo, WindowsResource};
 
 fn main() {
-    // neo-rimage links rimage as a library. Embedding the rimage CLI's VERSION
-    // resource in that mode collides with the Tauri application's resource at
-    // the final Windows link step. Keep upstream behavior for actual CLI builds.
-    if env::var_os("CARGO_FEATURE_BUILD_BINARY").is_none() {
+    // Without any rerun-if instruction Cargo re-runs this script when any
+    // package file changes. The script only depends on itself and on the
+    // version/target environment variables it reads, so scope the rebuilds
+    // to those. (The CARGO_PKG_* names are how Cargo is told to watch the
+    // manifest's version fields.)
+    println!("cargo:rerun-if-changed=build.rs");
+    for var in [
+        "CARGO_PKG_VERSION_MAJOR",
+        "CARGO_PKG_VERSION_MINOR",
+        "CARGO_PKG_VERSION_PATCH",
+        "CARGO_PKG_VERSION_PRE",
+        "CARGO_CFG_TARGET_OS",
+        "CARGO_CFG_TARGET_ENV",
+        "CARGO_FEATURE_BUILD_BINARY",
+    ] {
+        println!("cargo:rerun-if-env-changed={var}");
+    }
+
+    if std::env::var_os("CARGO_FEATURE_BUILD_BINARY").is_none() {
         return;
     }
 
     // only run if target os is windows
-    if env::var("CARGO_CFG_TARGET_OS").unwrap() != "windows" {
-        println!(
-            "cargo:warning={:#?}",
-            "This build script is only for windows target, skipping..."
-        );
+    if std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default() != "windows" {
         return;
     }
 
-    let mut res = winres::WindowsResource::new();
+    // The winresource-based version-info build script only supports the MSVC
+    // toolchain. Reject Windows GNU builds instead of failing later with a
+    // confusing linker/resource error.
+    if std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default() == "gnu" {
+        eprintln!(
+            "rimage on Windows only supports the MSVC toolchain; \
+             x86_64-pc-windows-gnu / i686-pc-windows-gnu are not supported"
+        );
+        std::process::exit(1);
+    }
 
-    match env::var("CARGO_PKG_VERSION_PRE") {
-        Ok(success_info) => println!("{success_info}"),
-        Err(err_info) => println!("{err_info}"),
-    };
+    let packed = (env_u64("CARGO_PKG_VERSION_MAJOR") << 48)
+        | (env_u64("CARGO_PKG_VERSION_MINOR") << 32)
+        | (env_u64("CARGO_PKG_VERSION_PATCH") << 16)
+        | (env_u64("CARGO_PKG_VERSION_PRE"));
 
-    //version    X.   X.    X.    X
-    //           ⇑    ⇑     ⇑    ⇑
-    //         MAJOR MINOR PATCH PRE
-    let mut version: u64 = 0;
-    version |= {
-        env::var("CARGO_PKG_VERSION_MAJOR")
-            .unwrap()
-            .parse::<u64>()
-            .unwrap()
-            << 48
-    };
-    version |= {
-        env::var("CARGO_PKG_VERSION_MINOR")
-            .unwrap()
-            .parse::<u64>()
-            .unwrap()
-            << 32
-    };
-    version |= {
-        env::var("CARGO_PKG_VERSION_PATCH")
-            .unwrap()
-            .parse::<u64>()
-            .unwrap()
-            << 16
-    };
+    let mut res = WindowsResource::new();
 
-    let product_version = version | {
-        let temp = env::var("CARGO_PKG_VERSION_PRE").unwrap();
-        if temp == *"" {
-            0_u64
-        } else {
-            temp.parse::<u64>().unwrap_or(0_u64)
-        }
-    };
-
-    res.set_version_info(VersionInfo::FILEVERSION, version)
-        .set_version_info(VersionInfo::PRODUCTVERSION, product_version);
+    res.set_version_info(VersionInfo::FILEVERSION, packed)
+        .set_version_info(VersionInfo::PRODUCTVERSION, packed);
 
     if let Err(e) = res.compile() {
         eprintln!("{e}");
         std::process::exit(1);
     }
+}
+
+fn env_u64(name: &str) -> u64 {
+    std::env::var(name).unwrap_or_default().parse().unwrap_or(0)
 }

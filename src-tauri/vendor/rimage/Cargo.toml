@@ -1,35 +1,36 @@
 [package]
-name          = "rimage"
-version       = "0.12.4"
-edition       = "2024"
-description   = "Optimize images natively with best-in-class codecs"
-license       = "MIT OR Apache-2.0"
-readme        = "README.md"
-authors       = ["Vladyslav Vladinov <vladinov.dev@gmail.com>"]
-keywords      = ["image", "compression", "encoder"]
-categories    = ["compression", "multimedia::images"]
-repository    = "https://github.com/SalOne22/rimage"
+name = "rimage"
+version = "0.14.0"
+edition = "2024"
+rust-version = "1.95.0"
+description = "Optimize images natively with best-in-class codecs"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+authors = ["Vladyslav Vladinov <vladinov.dev@gmail.com>"]
+keywords = ["image", "compression", "encoder"]
+categories = ["compression", "multimedia::images"]
+repository = "https://github.com/SalOne22/rimage"
 documentation = "https://docs.rs/rimage"
-homepage      = "https://lib.rs/rimage"
-include       = ["/README.md", "/Cargo.toml", "/src/**/*.rs"]
-build         = "build.rs"
+homepage = "https://lib.rs/rimage"
+include = ["/README.md", "/Cargo.toml", "/src/**/*.rs"]
+build = "build.rs"
 
-    [package.metadata.winres]
-    LegalCopyright  = "Copyright Vladyslav Vladinov © 2024-2026"
-    FileDescription = "Powerful img optimization CLI tool by Rust"
+[package.metadata.winresource]
+LegalCopyright = "Copyright Vladyslav Vladinov © 2024-2026"
+FileDescription = "Powerful img optimization CLI tool by Rust"
 
 [build-dependencies]
-winres = { version = "0.1.12", default-features = false }
+winresource = "0.1.31"
 
 [profile.release]
-lto           = true
+lto = true
 codegen-units = 1
-strip         = true
-panic         = "abort"
+strip = true
+panic = "abort"
 
 [[bin]]
-name              = "rimage"
-path              = "./src/main.rs"
+name = "rimage"
+path = "./src/main.rs"
 required-features = ["build-binary"]
 
 [features]
@@ -41,6 +42,7 @@ default = [
     "webp",
     "avif",
     "tiff",
+    "svg",
     "threads",
     "metadata",
 ]
@@ -51,9 +53,10 @@ build-binary = [
     "dep:clap",
     "dep:indoc",
     "dep:rayon",
-    "dep:pretty_env_logger",
+    "dep:env_logger",
     "dep:zune-imageprocs",
     "dep:glob",
+    "dep:filetime",
     "zune-image/default",
     "dep:indicatif",
     "dep:indicatif-log-bridge",
@@ -70,6 +73,7 @@ threads = [
     "oxipng?/parallel",
     "fast_image_resize?/rayon",
     "ravif?/threading",
+    "yuvutils-rs?/rayon",
     "zune-image/threads",
 ]
 # Enables metadata support
@@ -87,51 +91,76 @@ oxipng = ["dep:oxipng"]
 # Enables webp codec
 webp = ["dep:webp"]
 # Enables avif codec
-avif = ["dep:ravif", "dep:libavif", "dep:rgb"]
+avif = [
+    "dep:ravif",
+    "dep:rgb",
+    "dep:dav1d",
+    "dep:avif-parse",
+    "dep:yuvutils-rs",
+]
 # Enables tiff codec
-tiff    = ["dep:tiff"]
-icc     = ["dep:lcms2"]
+tiff = ["dep:tiff"]
+# Enables SVG input support (rendered via resvg)
+svg = ["dep:resvg", "dep:skrifa"]
+icc = ["dep:lcms2"]
 console = ["dep:console"]
+# Enables runtime system-resource probing, used to derive image size limits
+limits = ["dep:sysinfo"]
 
 [dependencies]
 log = "0.4"
-zune-core = { version = "0.5.1", features = ["std"] }
+# zune-core 0.5.3 would cause build error.
+# REF: https://github.com/etemesi254/zune-image/issues/439
+zune-core = { version = "=0.5.1", features = ["std"] }
 zune-image = { version = "0.5.0", features = ["simd"] }
-fast_image_resize = { version = "6.0", optional = true }
+fast_image_resize = { version = "6.1", optional = true }
 imagequant = { version = "4.4", default-features = false, optional = true }
 rgb = { version = "0.8", optional = true }
 mozjpeg = { version = "0.10.13", default-features = false, features = [
     "with_simd",
 ], optional = true }
-oxipng = { version = "10.1.1", default-features = false, features = [
+oxipng = { version = "10.2.1", default-features = false, features = [
     "zopfli",
 ], optional = true }
 webp = { version = "0.3", default-features = false, optional = true }
 ravif = { version = "0.13.0", optional = true }
-libavif = { version = "0.14.0", default-features = false, features = [
-    "codec-aom",
-], optional = true }
-lcms2 = { version = "6.1", optional = true }
+dav1d = { version = "0.11", optional = true }
+avif-parse = { version = "2.1", optional = true }
+yuvutils-rs = { version = "0.8", optional = true }
+lcms2 = { version = "6.2", optional = true }
 tiff = { version = "0.11.3", default-features = false, features = [
     "lzw",
 ], optional = true }
+resvg = { version = "0.48.1", default-features = false, features = [
+    "text",
+    "system-fonts",
+    "raster-images",
+], optional = true }
+skrifa = { version = "0.47.0", default-features = false, features = [
+    "std",
+], optional = true }
+
+# System resource probing for dynamic image size limits
+sysinfo = { version = "0.39.6", optional = true }
 
 # cli
 anyhow = { version = "1.0", optional = true }
-clap = { version = "4.6", features = ["cargo", "string"], optional = true }
+clap = { version = "4.6.7", features = ["cargo", "string"], optional = true }
 indoc = { version = "2.0", optional = true }
-pretty_env_logger = { version = "0.5.0", optional = true }
+env_logger = { version = "0.11", optional = true, default-features = false, features = [
+    "auto-color",
+] }
 rayon = { version = "1.12.0", optional = true }
-zune-imageprocs = { version = "0.5.0-rc0", features = [
-    "exif",
-], optional = true }
+zune-imageprocs = { version = "0.5.1", features = ["exif"], optional = true }
 little_exif = { version = "0.6.23", optional = true }
 indicatif = { version = "0.18", features = ["rayon"], optional = true }
 indicatif-log-bridge = { version = "0.2.3", optional = true }
 console = { version = "0.16", optional = true }
-regex = { version = "1.12", optional = true }
+regex = { version = "1.13", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
-
-[target.'cfg(windows)'.dependencies]
 glob = { version = "0.3", optional = true }
+filetime = { version = "0.2.29", optional = true }
+
+[target.'cfg(all(target_arch = "aarch64", target_os = "linux", target_env = "musl"))'.dependencies]
+ravif = { version = "0.13.0", default-features = false, optional = true }

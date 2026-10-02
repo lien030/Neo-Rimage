@@ -4,9 +4,9 @@ use crate::domain::{
 };
 use serde_json::{json, Value};
 
-pub const RIMAGE_SOURCE_REPOSITORY: &str = "https://github.com/SalOne22/rimage";
-pub const RIMAGE_SOURCE_VERSION: &str = "0.12.4";
-pub const RIMAGE_SOURCE_REVISION: &str = "0078ef746d75fef5db137018b6bf5b6eb7d715e5";
+pub const RIMAGE_SOURCE_REPOSITORY: &str = "https://github.com/vlad-salone/rimage";
+pub const RIMAGE_SOURCE_VERSION: &str = "0.14.0";
+pub const RIMAGE_SOURCE_REVISION: &str = "978a87075ad60fbbd033ba851036fbe84e9e0f47";
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct EngineCapabilitySet {

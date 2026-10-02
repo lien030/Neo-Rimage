@@ -80,12 +80,44 @@ By default rimage will place output images right in place of precious images, re
 # will place output images in `./output` directory, images may be overwritten if has the same name
 rimage mozjpeg -d ./output ./image.jpg
 
-# will rename all input files before processing with `@backup` suffix
+# will keep the original image as `<name>@backup.<ext>` next to the input
 rimage mozjpeg --backup ./image.jpg
 
 # will place output images in ./output directory preserving folder structure
 rimage mozjpeg -d ./output -r ./inner/image.jpg ./image.jpg
 ```
+
+### Color fidelity and chroma subsampling
+
+`rimage mozjpeg` lets MozJPEG choose the chroma subsampling automatically. At
+typical quality levels it picks **2x2 (4:2:0)**, which discards three quarters
+of the chroma resolution to make the file smaller. A side effect is that highly
+saturated colors (for example a bright red) can come out visibly darker or
+duller than the original.
+
+If color fidelity matters more than file size, force 4:4:4 with:
+
+```sh
+rimage mozjpeg --subsample 1 ./image.jpg
+```
+
+`1` means 4:4:4 (no chroma subsampling), `2` means 4:2:0. The default
+quantization table is `NRobidoux`; if you are comparing output with tools that
+use the standard Annex K tables (such as ImageMagick), pass
+`--qtable AnnexK` to make the comparison closer.
+
+### File lists
+
+To process many images without a long command line, create a UTF-8 text file named `file.list`
+with one input file per line and pass it as an input:
+
+```sh
+rimage mozjpeg file.list
+```
+
+Blank lines are skipped, surrounding whitespace is ignored, and relative paths are resolved
+against the current working directory. Glob patterns are supported on each line. When a
+`file.list` is provided, all other input file arguments are ignored.
 
 ### Preprocessing
 
@@ -94,13 +126,89 @@ run before encoding. Operations execute in CLI argument order.
 
 #### Resize
 
-```sh
-# Resize to fixed dimensions
-rimage mozjpeg --resize 500x200 ./image.jpg
+`--resize` accepts one of the following value forms. Unless a fixed `WxH` is
+given, the aspect ratio is preserved:
 
-# Resize by width, preserving aspect ratio (200h for height)
-rimage mozjpeg --resize 100w ./image.jpg
+| Form  | Meaning                                               | Example   | Result on 800x400 |
+| ----- | ----------------------------------------------------- | --------- | ----------------- |
+| `WxH` | Fixed width and height, aspect ratio is not preserved | `100x300` | `100x300`         |
+| `Ww`  | Anchor on the width, height follows the aspect ratio  | `100w`    | `100x50`          |
+| `hH`  | Anchor on the height, width follows the aspect ratio  | `200h`    | `400x200`         |
+| `Ll`  | Longest side becomes `L`, the other side follows      | `1000l`   | `1000x500`        |
+| `Ss`  | Shortest side becomes `S`, the other side follows     | `500s`    | `1000x500`        |
+| `@M`  | Scale by the multiplier `M`                           | `@1.5`    | `1200x600`        |
+| `P%`  | Scale to `P` percent of the source                    | `50%`     | `400x200`         |
+
+```sh
+# Fixed dimensions: the image is resized to exactly 100x200
+rimage mozjpeg --resize 100x200 ./image.jpg     # 800x400 -> 100x200
+
+# Anchor on one side, the other side follows the aspect ratio
+rimage mozjpeg --resize 100w ./image.jpg        # 800x400 -> 100x50
+rimage mozjpeg --resize 200h ./image.jpg        # 800x400 -> 400x200
+
+# Longest / shortest side: the anchor is chosen per image, so portrait and
+# landscape images in the same batch end up with a consistent size
+rimage mozjpeg --resize 1000l ./landscape.jpg   # 800x400 -> 1000x500
+rimage mozjpeg --resize 1000l ./portrait.jpg    # 400x800 -> 500x1000
+rimage mozjpeg --resize 500s ./landscape.jpg    # 800x400 -> 1000x500
+rimage mozjpeg --resize 500s ./portrait.jpg     # 400x800 -> 500x1000
+
+# Multiplier and percentage
+rimage mozjpeg --resize @2 ./image.jpg          # 800x400 -> 1600x800
+rimage mozjpeg --resize @0.5 ./image.jpg        # 800x400 -> 400x200
+rimage mozjpeg --resize 50% ./image.jpg         # 800x400 -> 400x200
+rimage mozjpeg --resize 150% ./image.jpg        # 800x400 -> 1200x600
 ```
+
+Passing `--resize` several times chains the values. Each value maps the size
+the previous resize produced, so the order of the values matters:
+
+```sh
+# 100x400 first, then the shortest side of that intermediate result
+rimage mozjpeg --resize 100x400 --resize 200s ./image.jpg   # 800x400 -> 200x800
+
+# Longest side first, then half of the intermediate result
+rimage mozjpeg --resize 1000l --resize 50% ./image.jpg      # 800x400 -> 500x250
+```
+
+The direction flags restrict each resize step to shrinking or growing only.
+`--reduce-only` is an alias for `--no-upscale` (never grow) and `--enlarge-only`
+is an alias for `--no-downscale` (never shrink):
+
+```sh
+# Shrink images whose longest side is above 1000px, leave the rest untouched
+rimage mozjpeg --resize 1000l --reduce-only ./small.jpg     # 800x400 -> 800x400
+rimage mozjpeg --resize 1000l --reduce-only ./big.jpg       # 2000x1000 -> 1000x500
+
+# Grow images whose longest side is below 1000px, leave the rest untouched
+rimage mozjpeg --resize 1000l --enlarge-only ./small.jpg    # 800x400 -> 1000x500
+rimage mozjpeg --resize 1000l --enlarge-only ./big.jpg      # 2000x1000 -> 2000x1000
+
+# A step that is not allowed by the flags is skipped, and the chain continues
+# from the size the image actually has
+rimage mozjpeg --resize 2000l --resize 50% --reduce-only ./image.jpg  # 800x400 -> 400x200
+```
+
+> **Note**: Passing both `--reduce-only` and `--enlarge-only` leaves no direction to resize
+> in, so every image keeps its original size. The order of the two flags makes no difference.
+
+`--filter` selects the resampling filter applied to every `--resize` step
+(default `lanczos3`). Available filters: `nearest`, `box`, `bilinear`,
+`hamming`, `catmull-rom`, `mitchell`, `lanczos3`.
+
+```sh
+rimage mozjpeg --resize 1000l --filter nearest ./image.jpg
+```
+
+SVG inputs are resized through the same `--resize` parameter. Instead of
+rasterizing the SVG at its intrinsic size and then resampling with
+`fast_image_resize`, the SVG is rendered vectorly with `resvg` directly at the
+final target size. Upscaling therefore keeps the vector quality of the source,
+and chained `--resize` values compose for SVG exactly as they do for raster
+images. `--filter` selects the raster resampling filter used by
+`fast_image_resize`; it is still accepted for SVG inputs (when `--resize` is
+present) but has no effect on vector SVG rendering.
 
 #### Quantization (color palette reduction)
 
@@ -134,6 +242,30 @@ rimage mozjpeg --resize 64x64 --filter nearest --quantization 80 ./image.jpg
 
 Note that `--filter` applies to all `--resize` invocations, and `--dithering`
 applies to all `--quantization` invocations.
+
+### SVG input
+
+SVG files (and gzipped `.svgz`) are rendered through `resvg` before encoding,
+so an SVG can be fed to any output format. By default the SVG renders at its
+intrinsic size — taken from its `width`/`height`, falling back to the
+`viewBox`.
+
+Use `--resize` to control the rasterization size. The SVG is rasterized
+directly at the requested size, so sizing is **lossless at any scale**: edges,
+gradients and text stay exactly as sharp when you enlarge it. Chained
+`--resize` values compose for SVG exactly as they do for raster images, and
+the direction flags (`--reduce-only`, `--enlarge-only`) work for SVG too.
+
+```sh
+# Render a 100x50 SVG at 2x and encode it as PNG
+rimage png --resize @2 ./logo.svg
+
+# Render at a fixed width for a 2x-density asset, height follows
+rimage mozjpeg --resize 800w ./logo.svg
+```
+
+`--resize` affects `.svg`/`.svgz` inputs and raster images alike. `--filter`
+is a raster resampling filter and has no effect on vector SVG rendering.
 
 ### Advanced options
 
@@ -185,16 +317,17 @@ For library usage check [Docs.rs](https://docs.rs/rimage/latest/rimage/)
 
 | Image Codecs | Decoder       | Encoder                 | NOTE                                                 |
 | ------------ | ------------- | ----------------------- | ---------------------------------------------------- |
-| avif         | libavif       | ravif                   | Common features only, Static only                    |
+| avif         | dav1d         | ravif                   | Common features only, Static only                    |
 | bmp          | zune-bmp      | ❌                      | Input only                                           |
 | farbfeld     | zune-farbfeld | zune-farbfeld           |                                                      |
 | hdr          | zune-hdr      | zune-hdr                |                                                      |
 | jpeg         | zune-jpeg     | mozjpeg or jpeg-encoder | Multifunctional when use mozjpeg encoder             |
-| jpeg-xl      | jxl-oxide     | zune-jpegxl             | Lossless only                                        |
+| jpeg-xl      | jxl-oxide     | zune-jpegxl             | Lossless only, Static only                           |
 | png          | zune-png      | oxipng or zune-png      | Static only, Multifunctional when use oxipng encoder |
 | ppm          | zune-ppm      | zune-ppm                |                                                      |
 | psd          | zune-psd      | ❌                      | Input only                                           |
 | qoi          | zune-qoi      | zune-qoi                |                                                      |
+| svg          | resvg         | ❌                      | Input only                                           |
 | tiff         | tiff          | ❌                      | Input only                                           |
 | webp         | webp          | webp                    | Static only                                          |
 
@@ -249,32 +382,54 @@ rimage png "D:\example.jpg" -s "suffix"  -d "D:\desktop\" # backslash at the end
 3. Install MSVC Build Tools (Windows):
    - Download and install from [Visual Studio 2026 Build Tools](https://visualstudio.microsoft.com/en-us/downloads/).
    - During installation, select "Desktop development with C++" workload.
-   - OR, just use `choco install visualstudio2022-workload-vctools` to install it.
+   - OR, just use `choco install visualstudio2026-workload-vctools` to install it.
 
-4. Install Perl:
-   - Download and install from [Strawberry Perl](https://strawberryperl.com/).
-   - OR, just use `choco install strawberryperl` to install it.
-
-5. Install cmake (OPTIONAL if you use the MSVC bundled version):
+4. Install cmake (OPTIONAL if you use the MSVC bundled version):
     - Download and install from [CMake](https://cmake.org/download/).
     - OR, just use `choco install cmake` to install it.
-    - OR, you can use the bundled cmake in MSVC, but please note that only 4.2.3+ could be used.
+    - OR, you can use the bundled cmake in MSVC, but please note that only **4.2.3** + could be used.
 
-6. **RENAME** cmake from perl:
-    - Go to `C:\Strawberry\c\bin` (Your Perl installation directory) and rename `cmake.exe` to `cmake.exe.bak` to avoid conflicts with cmake installed in step 5 (The bundled cmake in perl is outdated and would distrube build scripts).
+5. Install nasm (for the mozjpeg encoder's SIMD code):
+   - Download and install from [nasm](https://www.nasm.us/).
+   - OR, just use `choco install nasm` to install it.
 
-7. Make sure `$PATH`
-    - Make sure the cmake installed in step 5 is in your system `$PATH` and can be called from command line. You can check this by running `cmake --version` in your terminal, it should show the version of cmake you installed in step 5.
-    - Make sure Perl is in your system `$PATH` and can be called from command line. You can check this by running `perl --version` in your terminal, it should show the version of Perl you installed in step 4.
+6. Install dav1d through [vcpkg](https://vcpkg.io/) (the AVIF decoder links a
+   static dav1d found through pkg-config):
+
+    ```pwsh
+    vcpkg install dav1d:x64-windows-static pkgconf:x64-windows
+
+    # point the build at pkgconf and the dav1d package
+    $env:PKG_CONFIG = "$env:VCPKG_ROOT\installed\x64-windows\tools\pkgconf\pkgconf.exe"
+    $env:PKG_CONFIG_PATH = "$env:VCPKG_ROOT\installed\x64-windows-static\lib\pkgconfig"
+    ```
+
+    Use `x86-windows-static` instead of `x64-windows-static` when building for
+    the i686 target. To persist the two environment variables, add them with
+    `setx` or through the system settings.
+
+7. Make sure cmake is in your system `$PATH` and can be called from command
+   line. You can check this by running `cmake --version` in your terminal, it
+   should show the version of cmake you installed in step 4.
 
 8. Build / Test / Format the project:
 
     ```pwsh
-    cargo build --release --all-features # BUILD
-    cargo run --features=build-binary ... # TEST with args
-    cargo clippy --all-features -- -D warnings # CHECK
-    cargo fmt --all -- --check # FORMAT
-    cargo test --workspace --all-features # TEST
+    # build the library and the CLI binary
+    cargo build --all-features
+
+    # run the binary during development
+    cargo run --all-features -- mozjpeg ./image.jpg
+
+    # unit and integration tests (install cargo-nextest first, original `cargo test` is also acceptable)
+    cargo nextest run --release --all-features
+
+    # doc tests; nextest does not run them
+    cargo test --doc --release --all-features
+
+    # format and check for formatting issues
+    cargo clippy --all-features -- -D warnings
+    cargo fmt --all -- --check
     ```
 
 ## Contributing
