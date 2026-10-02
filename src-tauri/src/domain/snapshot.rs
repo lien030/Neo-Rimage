@@ -4,6 +4,7 @@ use super::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum JobStatus {
@@ -46,6 +47,7 @@ impl JobStatus {
     }
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ItemStatus {
@@ -80,6 +82,7 @@ impl ItemStatus {
     }
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SchedulerMode {
@@ -88,6 +91,7 @@ pub enum SchedulerMode {
     ShuttingDown,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkerSlotStatus {
@@ -96,6 +100,7 @@ pub enum WorkerSlotStatus {
     Draining,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackendSnapshot {
@@ -107,6 +112,7 @@ pub struct BackendSnapshot {
     pub jobs: Vec<JobSnapshot>,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SchedulerSnapshot {
@@ -118,6 +124,7 @@ pub struct SchedulerSnapshot {
     pub queued_items: u32,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkerSlotSnapshot {
@@ -130,6 +137,7 @@ pub struct WorkerSlotSnapshot {
     pub progress: Option<ItemProgress>,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JobSnapshot {
@@ -147,6 +155,7 @@ pub struct JobSnapshot {
     pub error: Option<AppError>,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JobCounts {
@@ -169,6 +178,7 @@ impl JobCounts {
     }
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JobProgressSnapshot {
@@ -184,6 +194,7 @@ impl JobProgressSnapshot {
     }
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JobControlAvailability {
@@ -194,6 +205,7 @@ pub struct JobControlAvailability {
     pub can_remove: bool,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ItemControlAvailability {
@@ -201,6 +213,7 @@ pub struct ItemControlAvailability {
     pub can_retry: bool,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ItemSnapshot {
@@ -225,6 +238,7 @@ pub struct ItemSnapshot {
     pub warnings: Vec<EngineWarning>,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ItemResultSummary {
@@ -234,6 +248,7 @@ pub struct ItemResultSummary {
     pub duration_ms: u64,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResultSummary {
@@ -252,6 +267,7 @@ impl ResultSummary {
     }
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JobDetailSnapshot {
@@ -261,6 +277,7 @@ pub struct JobDetailSnapshot {
     pub items: Page<ItemSnapshot>,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Page<T> {

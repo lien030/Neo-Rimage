@@ -3,6 +3,7 @@ use std::fmt;
 
 macro_rules! string_id {
     ($name:ident) => {
+        #[cfg_attr(test, derive(ts_rs::TS))]
         #[derive(
             Clone, Debug, Default, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
         )]
@@ -50,6 +51,7 @@ string_id!(CorrelationId);
 string_id!(DiagnosticId);
 
 /// Milliseconds since the Unix epoch. The producer owns clock accuracy.
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
 )]
@@ -57,6 +59,7 @@ string_id!(DiagnosticId);
 pub struct TimestampMs(pub u64);
 
 /// A globally monotonic JobManager observation revision.
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(
     Clone, Copy, Debug, Default, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize,
 )]

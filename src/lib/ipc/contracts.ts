@@ -1,580 +1,174 @@
-/**
- * JSON wire contract shared with the Rust backend. Field names and string
- * discriminants are protocol values; changing them requires a matching backend
- * change and, when incompatible, a schema-version bump.
- */
 export const IPC_SCHEMA_VERSION = 1 as const;
 export const JOB_CONFIG_VERSION = 1 as const;
 
-export type JobId = string;
-export type ItemId = string;
-export type WorkerSlotId = string;
-export type CorrelationId = string;
-export type DiagnosticId = string;
-export type Revision = number;
-export type TimestampMs = number;
+export type AppError = { code: ErrorCode, category: ErrorCategory, messageKey: string, messageArgs: { [key in string]: string }, fallbackMessage: string, retryable: boolean, fieldErrors: Array<FieldError>, context: ErrorContext, diagnosticId: DiagnosticId | null, };
 
-export type InputResourceKind = "file" | "directory";
-export type InputAcceptancePolicy = "reject_all" | "accept_valid";
-
-// Job creation configuration.
-
-export interface InputResource {
-  path: string;
-  kind: InputResourceKind;
-  scanRecursively: boolean;
-}
-
-export type ResizeFilter =
-  | "nearest"
-  | "bilinear"
-  | "hamming"
-  | "catmull_rom"
-  | "mitchell"
-  | "lanczos3";
-
-export type ResizeMode =
-  | { kind: "exact"; value: { width: number; height: number } }
-  | { kind: "fit_width"; value: { width: number } }
-  | { kind: "fit_height"; value: { height: number } }
-  | { kind: "percentage"; value: { percent: number } }
-  | { kind: "scale"; value: { factor: number } };
-
-export interface ResizeOperation {
-  mode: ResizeMode;
-  filter: ResizeFilter;
-  allowUpscale: boolean;
-  allowDownscale: boolean;
-}
-
-export interface QuantizeOperation {
-  quality: number;
-}
-
-export interface DitherOperation {
-  strength: number | null;
-}
-
-export type Operation =
-  | { kind: "resize"; config: ResizeOperation }
-  | { kind: "quantize"; config: QuantizeOperation }
-  | { kind: "dither"; config: DitherOperation }
-  | { kind: "premultiply_alpha" };
-
-export type EncoderKind =
-  | "mozjpeg"
-  | "jpeg"
-  | "avif"
-  | "oxipng"
-  | "webp"
-  | "jpeg_xl"
-  | "png"
-  | "farbfeld"
-  | "ppm"
-  | "qoi";
-
-export type MozJpegColorSpace = "ycbcr" | "rgb" | "grayscale";
-export type MozJpegQuantizationTable =
-  | "ahumada_watson_peterson"
-  | "annex_k"
-  | "flat"
-  | "klein_silverstein_carney"
-  | "msssim"
-  | "n_robidoux"
-  | "psnr_hvs"
-  | "peterson_ahumada_watson"
-  | "watson_taylor_borthwick";
-
-export interface MozJpegConfig {
-  quality: number;
-  chromaQuality: number | null;
-  progressive: boolean;
-  optimizeCoding: boolean;
-  smoothing: number;
-  colorSpace: MozJpegColorSpace;
-  trellisMultipass: boolean;
-  chromaSubsample: number | null;
-  quantizationTable: MozJpegQuantizationTable | null;
-}
-
-export interface JpegConfig {
-  quality: number;
-  progressive: boolean;
-}
+export type AvifAlphaMode = "unassociated_dirty" | "unassociated_clean" | "premultiplied";
 
 export type AvifColorSpace = "ycbcr" | "rgb";
-export type AvifAlphaMode =
-  | "unassociated_dirty"
-  | "unassociated_clean"
-  | "premultiplied";
 
-export interface AvifConfig {
-  quality: number;
-  alphaQuality: number | null;
-  speed: number;
-  colorSpace: AvifColorSpace;
-  alphaMode: AvifAlphaMode;
-}
+export type AvifConfig = { quality: number, alphaQuality: number | null, speed: number, colorSpace: AvifColorSpace, alphaMode: AvifAlphaMode, };
 
-export interface OxiPngConfig {
-  interlace: boolean;
-  effort: number;
-}
+export type BackendCapabilities = { schemaVersion: number, jobConfigVersion: number, backendVersion: string, rimageVersion: string, rimageRevision: string | null, encoders: Array<EncoderCapability>, operations: Array<OperationCapability>, metadata: MetadataCapability, concurrency: ConcurrencyCapability, };
 
-export interface WebPConfig {
-  lossless: boolean;
-  quality: number;
-  slightLoss: number;
-  exact: boolean;
-}
+export type BackendNotice = { "kind": "capability_degraded", "payload": { reason_code: string, } } | { "kind": "temporary_files_cleaned", "payload": { removed: number, failed: number, } } | { "kind": "event_bridge_reconnected" } | { "kind": "shutdown_timed_out", "payload": { item_ids: Array<ItemId>, } };
 
-export type EncoderConfig =
-  | { kind: "mozjpeg"; options: MozJpegConfig }
-  | { kind: "jpeg"; options: JpegConfig }
-  | { kind: "avif"; options: AvifConfig }
-  | { kind: "oxipng"; options: OxiPngConfig }
-  | { kind: "webp"; options: WebPConfig }
-  | { kind: "jpeg_xl" }
-  | { kind: "png" }
-  | { kind: "farbfeld" }
-  | { kind: "ppm" }
-  | { kind: "qoi" };
+export type BackendSnapshot = { schemaVersion: number, revision: Revision, generatedAt: TimestampMs, scheduler: SchedulerSnapshot, workerSlots: Array<WorkerSlotSnapshot>, jobs: Array<JobSnapshot>, };
 
-export type OutputLocation =
-  | { kind: "same_directory" }
-  | { kind: "directory"; path: string };
-export type CollisionPolicy = "fail" | "replace" | "auto_rename";
 export type BackupPolicy = "disabled" | "enabled";
 
-export interface OutputPolicy {
-  location: OutputLocation;
-  preserveStructure: boolean;
-  suffix: string;
-  collision: CollisionPolicy;
-  sourceBackup: BackupPolicy;
-  existingOutputBackup: BackupPolicy;
-}
+export type CollisionPolicy = "fail" | "replace" | "auto_rename";
+
+export type ColorProfilePolicy = "preserve_when_supported" | "convert_to_srgb" | "strip_after_conversion";
+
+export type CommandAccepted<T> = { schemaVersion: number, correlationId: CorrelationId, revision: Revision, snapshot: T, };
+
+export type CommandErrorEnvelope = { schemaVersion: number, correlationId: CorrelationId, error: AppError, };
+
+export type ConcurrencyCapability = { default: number, minimum: number, maximum: number, };
+
+export type CorrelationId = string;
+
+export type CreateJobCommand = { correlationId: CorrelationId, request: CreateJobRequest, };
+
+export type CreateJobRequest = { schemaVersion: number, inputs: Array<InputResource>, operations: Array<Operation>, encoder: EncoderConfig, output: OutputPolicy, metadata: MetadataPolicy, inputAcceptance: InputAcceptancePolicy, scheduling: SchedulingHint | null, };
+
+export type CreateJobResponse = { schemaVersion: number, correlationId: CorrelationId, revision: Revision, job: JobSnapshot, items: Array<ItemSnapshot>, rejectedInputs: Array<RejectedInput>, };
+
+export type DiagnosticId = string;
+
+export type DitherOperation = { strength: number | null, };
 
 export type EmbeddedMetadataPolicy = "preserve_when_supported" | "strip";
-export type ColorProfilePolicy =
-  | "preserve_when_supported"
-  | "convert_to_srgb"
-  | "strip_after_conversion";
-export type ProcessingReportPolicy =
-  | { kind: "disabled" }
-  | { kind: "json"; path: string };
 
-export interface MetadataPolicy {
-  embedded: EmbeddedMetadataPolicy;
-  colorProfile: ColorProfilePolicy;
-  report: ProcessingReportPolicy;
-}
+export type EncoderCapability = { kind: EncoderKind, available: boolean, outputExtensions: Array<string>, options: Array<OptionCapability>, limitations: Array<string>, };
 
-export interface SchedulingHint {
-  requestedConcurrency: number | null;
-}
+export type EncoderConfig = { "kind": "mozjpeg", "options": MozJpegConfig } | { "kind": "jpeg", "options": JpegConfig } | { "kind": "avif", "options": AvifConfig } | { "kind": "oxipng", "options": OxiPngConfig } | { "kind": "webp", "options": WebPConfig } | { "kind": "jpeg_xl" } | { "kind": "png" } | { "kind": "farbfeld" } | { "kind": "ppm" } | { "kind": "qoi" };
 
-export interface CreateJobRequest {
-  schemaVersion: number;
-  inputs: InputResource[];
-  operations: Operation[];
-  encoder: EncoderConfig;
-  output: OutputPolicy;
-  metadata: MetadataPolicy;
-  inputAcceptance: InputAcceptancePolicy;
-  scheduling: SchedulingHint | null;
-}
+export type EncoderKind = "mozjpeg" | "jpeg" | "avif" | "oxipng" | "webp" | "jpeg_xl" | "png" | "farbfeld" | "ppm" | "qoi";
 
-// Runtime progress and read-only backend snapshots.
+export type EngineWarning = { code: string, stage: ProcessingStage | null, messageKey: string, messageArgs: { [key in string]: string }, fallbackMessage: string, };
 
-export type ProcessingStage =
-  | "preflight"
-  | "inspect"
-  | "decode"
-  | "normalize"
-  | "operations"
-  | "encode"
-  | "commit"
-  | "metadata_finalize"
-  | "complete";
+export type ErrorCategory = "validation" | "protocol" | "input" | "processing" | "encoding" | "output" | "metadata" | "cancelled" | "backend" | "internal";
 
-export type ProgressMeasure =
-  | { kind: "indeterminate" }
-  | { kind: "fraction"; completed: number; total: number };
+export type ErrorCode = string;
 
-export interface ItemProgress {
-  stage: ProcessingStage;
-  measure: ProgressMeasure;
-}
+export type ErrorContext = { jobId: JobId | null, itemId: ItemId | null, stage: ProcessingStage | null, path: string | null, };
 
-export interface EngineWarning {
-  code: string;
-  stage: ProcessingStage | null;
-  messageKey: string;
-  messageArgs: Record<string, string>;
-  fallbackMessage: string;
-}
+export type FieldError = { fieldPath: string, code: ErrorCode, messageKey: string, messageArgs: { [key in string]: string }, };
 
-export type ErrorCategory =
-  | "validation"
-  | "protocol"
-  | "input"
-  | "processing"
-  | "encoding"
-  | "output"
-  | "metadata"
-  | "cancelled"
-  | "backend"
-  | "internal";
+export type InputAcceptancePolicy = "reject_all" | "accept_valid";
 
-export interface ErrorContext {
-  jobId: JobId | null;
-  itemId: ItemId | null;
-  stage: ProcessingStage | null;
-  path: string | null;
-}
+export type InputResource = { path: string, kind: InputResourceKind, scanRecursively: boolean, };
 
-export interface FieldError {
-  fieldPath: string;
-  code: string;
-  messageKey: string;
-  messageArgs: Record<string, string>;
-}
+export type InputResourceKind = "file" | "directory";
 
-export interface AppError {
-  code: string;
-  category: ErrorCategory;
-  messageKey: string;
-  messageArgs: Record<string, string>;
-  fallbackMessage: string;
-  retryable: boolean;
-  fieldErrors: FieldError[];
-  context: ErrorContext;
-  diagnosticId: DiagnosticId | null;
-}
+export type ItemControlAvailability = { canCancel: boolean, canRetry: boolean, };
 
-export interface CommandErrorEnvelope {
-  schemaVersion: number;
-  correlationId: CorrelationId;
-  error: AppError;
-}
+export type ItemId = string;
 
-export type JobStatus =
-  | "queued"
-  | "running"
-  | "paused"
-  | "cancelling"
-  | "succeeded"
-  | "partially_succeeded"
-  | "failed"
-  | "cancelled";
+export type ItemProgress = { stage: ProcessingStage, measure: ProgressMeasure, };
 
-export type ItemStatus =
-  | "queued"
-  | "running"
-  | "cancelling"
-  | "succeeded"
-  | "failed"
-  | "cancelled"
-  | "skipped";
+export type ItemResultSummary = { outputPath: string, inputBytes: number, outputBytes: number, durationMs: number, };
+
+export type ItemSnapshot = { id: ItemId, jobId: JobId, revision: Revision, sequence: number, attempt: number, inputPath: string, outputPath: string | null, status: ItemStatus, stage: ProcessingStage | null, progress: ItemProgress | null, workerSlotId: WorkerSlotId | null, createdAt: TimestampMs, startedAt: TimestampMs | null, finishedAt: TimestampMs | null, controls: ItemControlAvailability, result: ItemResultSummary | null, error: AppError | null, warnings: Array<EngineWarning>, };
+
+export type ItemStatus = "queued" | "running" | "cancelling" | "succeeded" | "failed" | "cancelled" | "skipped";
+
+export type JobCommand = { schemaVersion: number, correlationId: CorrelationId, jobId: JobId, };
+
+export type JobControlAvailability = { canPause: boolean, canResume: boolean, canCancel: boolean, canRetry: boolean, canRemove: boolean, };
+
+export type JobCounts = { total: number, queued: number, running: number, cancelling: number, succeeded: number, failed: number, cancelled: number, skipped: number, };
+
+export type JobDetailSnapshot = { schemaVersion: number, revision: Revision, job: JobSnapshot, items: Page<ItemSnapshot>, };
+
+export type JobId = string;
+
+export type JobProgressSnapshot = { completedItems: number, totalItems: number, activeItems: number, };
+
+export type JobSnapshot = { id: JobId, revision: Revision, configVersion: number, encoder: EncoderKind, status: JobStatus, createdAt: TimestampMs, updatedAt: TimestampMs, counts: JobCounts, progress: JobProgressSnapshot, controls: JobControlAvailability, result: ResultSummary | null, error: AppError | null, };
+
+export type JobStatus = "queued" | "running" | "paused" | "cancelling" | "succeeded" | "partially_succeeded" | "failed" | "cancelled";
+
+export type JpegConfig = { quality: number, progressive: boolean, };
+
+export type JsonValue = number | string | boolean | Array<JsonValue> | { [key in string]: JsonValue } | null;
+
+export type MetadataCapability = { embeddedMetadata: boolean, iccProfiles: boolean, autoOrient: boolean, processingReport: boolean, };
+
+export type MetadataPolicy = { embedded: EmbeddedMetadataPolicy, colorProfile: ColorProfilePolicy, report: ProcessingReportPolicy, };
+
+export type MozJpegColorSpace = "ycbcr" | "rgb" | "grayscale";
+
+export type MozJpegConfig = { quality: number, chromaQuality: number | null, progressive: boolean, optimizeCoding: boolean, smoothing: number, colorSpace: MozJpegColorSpace, trellisMultipass: boolean, chromaSubsample: number | null, quantizationTable: MozJpegQuantizationTable | null, };
+
+export type MozJpegQuantizationTable = "ahumada_watson_peterson" | "annex_k" | "flat" | "klein_silverstein_carney" | "msssim" | "n_robidoux" | "psnr_hvs" | "peterson_ahumada_watson" | "watson_taylor_borthwick";
+
+export type NoticeEventEnvelope = { schemaVersion: number, occurredAt: TimestampMs, notice: BackendNotice, };
+
+export type Operation = { "kind": "resize", "config": ResizeOperation } | { "kind": "quantize", "config": QuantizeOperation } | { "kind": "dither", "config": DitherOperation } | { "kind": "premultiply_alpha" };
+
+export type OperationCapability = { kind: OperationKind, available: boolean, options: Array<OptionCapability>, limitations: Array<string>, };
+
+export type OperationKind = "resize" | "quantize" | "dither" | "premultiply_alpha";
+
+export type OptionCapability = { path: string, valueType: OptionValueType, required: boolean, defaultValue: JsonValue | null, constraints: OptionConstraints, requires: Array<string>, conflictsWith: Array<string>, };
+
+export type OptionConstraints = { minimum: number | null, maximum: number | null, step: number | null, allowedValues: Array<JsonValue>, };
+
+export type OptionValueType = "boolean" | "integer" | "number" | "string" | "enum";
+
+export type OutputLocation = { "kind": "same_directory" } | { "kind": "directory", "path": string };
+
+export type OutputPolicy = { location: OutputLocation, preserveStructure: boolean, suffix: string, collision: CollisionPolicy, sourceBackup: BackupPolicy, existingOutputBackup: BackupPolicy, };
+
+export type OxiPngConfig = { interlace: boolean, effort: number, };
+
+export type Page<T> = { items: Array<T>, offset: number, limit: number, total: number, };
+
+export type ProcessingReportPolicy = { "kind": "disabled" } | { "kind": "json", "path": string };
+
+export type ProcessingStage = "preflight" | "inspect" | "decode" | "normalize" | "operations" | "encode" | "commit" | "metadata_finalize" | "complete";
+
+export type ProgressMeasure = { "kind": "indeterminate" } | { "kind": "fraction", completed: number, total: number, };
+
+export type QuantizeOperation = { quality: number, };
+
+export type RejectedInput = { inputIndex: number, path: string, error: AppError, };
+
+export type ResizeFilter = "nearest" | "bilinear" | "hamming" | "catmull_rom" | "mitchell" | "lanczos3";
+
+export type ResizeMode = { "kind": "exact", "value": { width: number, height: number, } } | { "kind": "fit_width", "value": { width: number, } } | { "kind": "fit_height", "value": { height: number, } } | { "kind": "percentage", "value": { percent: number, } } | { "kind": "scale", "value": { factor: number, } };
+
+export type ResizeOperation = { mode: ResizeMode, filter: ResizeFilter, allowUpscale: boolean, allowDownscale: boolean, };
+
+export type ResultSummary = { totalInputBytes: number, totalOutputBytes: number, durationMs: number, succeeded: number, failed: number, cancelled: number, skipped: number, };
+
+export type RetryItemsCommand = { schemaVersion: number, correlationId: CorrelationId, jobId: JobId, itemIds: Array<ItemId>, includeCancelled: boolean, };
+
+export type Revision = number;
 
 export type SchedulerMode = "running" | "paused" | "shutting_down";
+
+export type SchedulerSnapshot = { mode: SchedulerMode, desiredConcurrency: number, effectiveConcurrency: number, maxConcurrency: number, activeItems: number, queuedItems: number, };
+
+export type SchedulingHint = { requestedConcurrency: number | null, };
+
+export type SetSchedulerPausedCommand = { schemaVersion: number, correlationId: CorrelationId, paused: boolean, };
+
+export type SetWorkerCountCommand = { schemaVersion: number, correlationId: CorrelationId, desiredConcurrency: number, };
+
+export type StateEvent = { "kind": "snapshot_invalidated" } | { "kind": "scheduler_changed", "payload": SchedulerSnapshot } | { "kind": "worker_slots_changed", "payload": Array<WorkerSlotSnapshot> } | { "kind": "job_changed", "payload": JobSnapshot } | { "kind": "item_changed", "payload": ItemSnapshot } | { "kind": "progress_changed", "payload": { job_id: JobId, item_id: ItemId, progress: ItemProgress, } } | { "kind": "backend_shutting_down", "payload": { grace_period_ms: number, } };
+
+export type StateEventEnvelope = { schemaVersion: number, revision: Revision, occurredAt: TimestampMs, correlationId: CorrelationId | null, event: StateEvent, };
+
+export type TimestampMs = number;
+
+export type WebPConfig = { lossless: boolean, quality: number, slightLoss: number, exact: boolean, };
+
+export type WorkerSlotId = string;
+
+export type WorkerSlotSnapshot = { id: WorkerSlotId, status: WorkerSlotStatus, itemId: ItemId | null, inputPath: string | null, stage: ProcessingStage | null, progress: ItemProgress | null, };
+
 export type WorkerSlotStatus = "idle" | "busy" | "draining";
-
-export interface SchedulerSnapshot {
-  readonly mode: SchedulerMode;
-  readonly desiredConcurrency: number;
-  readonly effectiveConcurrency: number;
-  readonly maxConcurrency: number;
-  readonly activeItems: number;
-  readonly queuedItems: number;
-}
-
-export interface WorkerSlotSnapshot {
-  readonly id: WorkerSlotId;
-  readonly status: WorkerSlotStatus;
-  readonly itemId: ItemId | null;
-  readonly inputPath: string | null;
-  readonly stage: ProcessingStage | null;
-  readonly progress: ItemProgress | null;
-}
-
-export interface JobCounts {
-  readonly total: number;
-  readonly queued: number;
-  readonly running: number;
-  readonly cancelling: number;
-  readonly succeeded: number;
-  readonly failed: number;
-  readonly cancelled: number;
-  readonly skipped: number;
-}
-
-export interface JobProgressSnapshot {
-  readonly completedItems: number;
-  readonly totalItems: number;
-  readonly activeItems: number;
-}
-
-export interface JobControlAvailability {
-  readonly canPause: boolean;
-  readonly canResume: boolean;
-  readonly canCancel: boolean;
-  readonly canRetry: boolean;
-  readonly canRemove: boolean;
-}
-
-export interface ItemControlAvailability {
-  readonly canCancel: boolean;
-  readonly canRetry: boolean;
-}
-
-export interface ResultSummary {
-  readonly totalInputBytes: number;
-  readonly totalOutputBytes: number;
-  readonly durationMs: number;
-  readonly succeeded: number;
-  readonly failed: number;
-  readonly cancelled: number;
-  readonly skipped: number;
-}
-
-export interface ItemResultSummary {
-  readonly outputPath: string;
-  readonly inputBytes: number;
-  readonly outputBytes: number;
-  readonly durationMs: number;
-}
-
-export interface JobSnapshot {
-  readonly id: JobId;
-  readonly revision: Revision;
-  readonly configVersion: number;
-  readonly encoder: EncoderKind;
-  readonly status: JobStatus;
-  readonly createdAt: TimestampMs;
-  readonly updatedAt: TimestampMs;
-  readonly counts: JobCounts;
-  readonly progress: JobProgressSnapshot;
-  readonly controls: JobControlAvailability;
-  readonly result: ResultSummary | null;
-  readonly error: AppError | null;
-}
-
-export interface ItemSnapshot {
-  readonly id: ItemId;
-  readonly jobId: JobId;
-  readonly revision: Revision;
-  readonly sequence: number;
-  readonly attempt: number;
-  readonly inputPath: string;
-  readonly outputPath: string | null;
-  readonly status: ItemStatus;
-  readonly stage: ProcessingStage | null;
-  readonly progress: ItemProgress | null;
-  readonly workerSlotId: WorkerSlotId | null;
-  readonly createdAt: TimestampMs;
-  readonly startedAt: TimestampMs | null;
-  readonly finishedAt: TimestampMs | null;
-  readonly controls: ItemControlAvailability;
-  readonly result: ItemResultSummary | null;
-  readonly error: AppError | null;
-  readonly warnings: readonly EngineWarning[];
-}
-
-export interface BackendSnapshot {
-  readonly schemaVersion: number;
-  readonly revision: Revision;
-  readonly generatedAt: TimestampMs;
-  readonly scheduler: SchedulerSnapshot;
-  readonly workerSlots: readonly WorkerSlotSnapshot[];
-  readonly jobs: readonly JobSnapshot[];
-}
-
-export interface Page<T> {
-  readonly items: readonly T[];
-  readonly offset: number;
-  readonly limit: number;
-  readonly total: number;
-}
-
-export interface JobDetailSnapshot {
-  readonly schemaVersion: number;
-  readonly revision: Revision;
-  readonly job: JobSnapshot;
-  readonly items: Page<ItemSnapshot>;
-}
-
-// Commands and command responses.
-
-export interface CreateJobCommand {
-  correlationId: CorrelationId;
-  request: CreateJobRequest;
-}
-
-export interface RejectedInput {
-  readonly inputIndex: number;
-  readonly path: string;
-  readonly error: AppError;
-}
-
-export interface CreateJobResponse {
-  readonly schemaVersion: number;
-  readonly correlationId: CorrelationId;
-  readonly revision: Revision;
-  readonly job: JobSnapshot;
-  readonly items: readonly ItemSnapshot[];
-  readonly rejectedInputs: readonly RejectedInput[];
-}
-
-export interface JobCommand {
-  schemaVersion: number;
-  correlationId: CorrelationId;
-  jobId: JobId;
-}
-
-export interface RetryItemsCommand extends JobCommand {
-  itemIds: ItemId[];
-  includeCancelled: boolean;
-}
-
-export interface SetSchedulerPausedCommand {
-  schemaVersion: number;
-  correlationId: CorrelationId;
-  paused: boolean;
-}
-
-export interface SetWorkerCountCommand {
-  schemaVersion: number;
-  correlationId: CorrelationId;
-  desiredConcurrency: number;
-}
-
-export interface CommandAccepted<T> {
-  readonly schemaVersion: number;
-  readonly correlationId: CorrelationId;
-  readonly revision: Revision;
-  readonly snapshot: T;
-}
-
-// Revisioned push events. Consumers use these as invalidation hints and fetch
-// an authoritative snapshot rather than merging partial payloads in place.
-
-export type StateEvent =
-  | { kind: "snapshot_invalidated" }
-  | { kind: "scheduler_changed"; payload: SchedulerSnapshot }
-  | { kind: "worker_slots_changed"; payload: WorkerSlotSnapshot[] }
-  | { kind: "job_changed"; payload: JobSnapshot }
-  | { kind: "item_changed"; payload: ItemSnapshot }
-  | {
-      kind: "progress_changed";
-      payload: {
-        jobId: JobId;
-        itemId: ItemId;
-        progress: ItemProgress;
-      };
-    }
-  | { kind: "backend_shutting_down"; payload: { gracePeriodMs: number } };
-
-export interface StateEventEnvelope {
-  readonly schemaVersion: number;
-  readonly revision: Revision;
-  readonly occurredAt: TimestampMs;
-  readonly correlationId: CorrelationId | null;
-  readonly event: StateEvent;
-}
-
-export type BackendNotice =
-  | { kind: "capability_degraded"; payload: { reasonCode: string } }
-  | {
-      kind: "temporary_files_cleaned";
-      payload: { removed: number; failed: number };
-    }
-  | { kind: "event_bridge_reconnected" }
-  | { kind: "shutdown_timed_out"; payload: { itemIds: ItemId[] } };
-
-export interface NoticeEventEnvelope {
-  readonly schemaVersion: number;
-  readonly occurredAt: TimestampMs;
-  readonly notice: BackendNotice;
-}
-
-// Capability discovery metadata used to constrain editable frontend options.
-
-export type JsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | JsonValue[]
-  | { [key: string]: JsonValue };
-
-export type OptionValueType =
-  | "boolean"
-  | "integer"
-  | "number"
-  | "string"
-  | "enum";
-
-export interface OptionConstraints {
-  readonly minimum: number | null;
-  readonly maximum: number | null;
-  readonly step: number | null;
-  readonly allowedValues: readonly JsonValue[];
-}
-
-export interface OptionCapability {
-  readonly path: string;
-  readonly valueType: OptionValueType;
-  readonly required: boolean;
-  readonly defaultValue: JsonValue | null;
-  readonly constraints: OptionConstraints;
-  readonly requires: readonly string[];
-  readonly conflictsWith: readonly string[];
-}
-
-export interface EncoderCapability {
-  readonly kind: EncoderKind;
-  readonly available: boolean;
-  readonly outputExtensions: readonly string[];
-  readonly options: readonly OptionCapability[];
-  readonly limitations: readonly string[];
-}
-
-export type OperationKind =
-  | "resize"
-  | "quantize"
-  | "dither"
-  | "premultiply_alpha";
-
-export interface OperationCapability {
-  readonly kind: OperationKind;
-  readonly available: boolean;
-  readonly options: readonly OptionCapability[];
-  readonly limitations: readonly string[];
-}
-
-export interface MetadataCapability {
-  readonly embeddedMetadata: boolean;
-  readonly iccProfiles: boolean;
-  readonly autoOrient: boolean;
-  readonly processingReport: boolean;
-}
-
-export interface ConcurrencyCapability {
-  readonly default: number;
-  readonly minimum: number;
-  readonly maximum: number;
-}
-
-export interface BackendCapabilities {
-  readonly schemaVersion: number;
-  readonly jobConfigVersion: number;
-  readonly backendVersion: string;
-  readonly rimageVersion: string;
-  readonly rimageRevision: string | null;
-  readonly encoders: readonly EncoderCapability[];
-  readonly operations: readonly OperationCapability[];
-  readonly metadata: MetadataCapability;
-  readonly concurrency: ConcurrencyCapability;
-}

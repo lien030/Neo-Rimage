@@ -22,6 +22,7 @@ pub mod command_names {
     pub const SET_WORKER_COUNT: &str = "set_worker_count";
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateJobCommand {
@@ -29,6 +30,7 @@ pub struct CreateJobCommand {
     pub request: CreateJobRequest,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateJobResponse {
@@ -41,6 +43,7 @@ pub struct CreateJobResponse {
     pub rejected_inputs: Vec<RejectedInput>,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RejectedInput {
@@ -49,6 +52,7 @@ pub struct RejectedInput {
     pub error: AppError,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JobCommand {
@@ -57,6 +61,7 @@ pub struct JobCommand {
     pub job_id: JobId,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RetryItemsCommand {
@@ -68,6 +73,7 @@ pub struct RetryItemsCommand {
     pub include_cancelled: bool,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetSchedulerPausedCommand {
@@ -76,6 +82,7 @@ pub struct SetSchedulerPausedCommand {
     pub paused: bool,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetWorkerCountCommand {
@@ -84,6 +91,7 @@ pub struct SetWorkerCountCommand {
     pub desired_concurrency: u16,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandAccepted<T> {
@@ -97,6 +105,7 @@ pub type JobCommandResponse = CommandAccepted<JobSnapshot>;
 pub type SchedulerCommandResponse = CommandAccepted<SchedulerSnapshot>;
 pub type WorkerCountCommandResponse = CommandAccepted<Vec<WorkerSlotSnapshot>>;
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StateEventEnvelope {
@@ -119,6 +128,7 @@ impl StateEventEnvelope {
     }
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", content = "payload", rename_all = "snake_case")]
 pub enum StateEvent {
@@ -137,6 +147,7 @@ pub enum StateEvent {
     },
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoticeEventEnvelope {
@@ -145,6 +156,7 @@ pub struct NoticeEventEnvelope {
     pub notice: BackendNotice,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", content = "payload", rename_all = "snake_case")]
 pub enum BackendNotice {

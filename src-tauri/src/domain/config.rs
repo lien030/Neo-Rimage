@@ -2,6 +2,7 @@ use super::{ItemId, JobId, TimestampMs, IPC_SCHEMA_VERSION, JOB_CONFIG_VERSION};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateJobRequest {
@@ -30,6 +31,7 @@ impl CreateJobRequest {
     }
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InputResource {
@@ -39,6 +41,7 @@ pub struct InputResource {
     pub scan_recursively: bool,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InputResourceKind {
@@ -46,6 +49,7 @@ pub enum InputResourceKind {
     Directory,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InputAcceptancePolicy {
@@ -54,6 +58,7 @@ pub enum InputAcceptancePolicy {
     AcceptValid,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "kind", content = "config", rename_all = "snake_case")]
 pub enum Operation {
@@ -63,6 +68,7 @@ pub enum Operation {
     PremultiplyAlpha,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResizeOperation {
@@ -74,6 +80,7 @@ pub struct ResizeOperation {
     pub allow_downscale: bool,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum ResizeMode {
@@ -84,6 +91,7 @@ pub enum ResizeMode {
     Scale { factor: f32 },
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ResizeFilter {
@@ -95,18 +103,21 @@ pub enum ResizeFilter {
     Lanczos3,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuantizeOperation {
     pub quality: f32,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DitherOperation {
     pub strength: Option<f32>,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "kind", content = "options")]
 pub enum EncoderConfig {
@@ -149,6 +160,7 @@ impl EncoderConfig {
     }
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum EncoderKind {
     #[serde(rename = "mozjpeg")]
@@ -173,6 +185,7 @@ pub enum EncoderKind {
     Qoi,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MozJpegConfig {
@@ -203,6 +216,7 @@ impl Default for MozJpegConfig {
     }
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum MozJpegColorSpace {
     #[serde(rename = "ycbcr")]
@@ -213,6 +227,7 @@ pub enum MozJpegColorSpace {
     Grayscale,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum MozJpegQuantizationTable {
     #[serde(rename = "ahumada_watson_peterson")]
@@ -235,6 +250,7 @@ pub enum MozJpegQuantizationTable {
     WatsonTaylorBorthwick,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JpegConfig {
@@ -242,6 +258,7 @@ pub struct JpegConfig {
     pub progressive: bool,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AvifConfig {
@@ -252,6 +269,7 @@ pub struct AvifConfig {
     pub alpha_mode: AvifAlphaMode,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum AvifColorSpace {
     #[serde(rename = "ycbcr")]
@@ -260,6 +278,7 @@ pub enum AvifColorSpace {
     Rgb,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AvifAlphaMode {
@@ -268,6 +287,7 @@ pub enum AvifAlphaMode {
     Premultiplied,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OxiPngConfig {
@@ -275,6 +295,7 @@ pub struct OxiPngConfig {
     pub effort: u8,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WebPConfig {
@@ -284,6 +305,7 @@ pub struct WebPConfig {
     pub exact: bool,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputPolicy {
@@ -297,6 +319,7 @@ pub struct OutputPolicy {
     pub existing_output_backup: BackupPolicy,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", content = "path", rename_all = "snake_case")]
 pub enum OutputLocation {
@@ -304,6 +327,7 @@ pub enum OutputLocation {
     Directory(String),
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CollisionPolicy {
@@ -312,6 +336,7 @@ pub enum CollisionPolicy {
     AutoRename,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BackupPolicy {
@@ -320,6 +345,7 @@ pub enum BackupPolicy {
     Enabled,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MetadataPolicy {
@@ -338,6 +364,7 @@ impl Default for MetadataPolicy {
     }
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EmbeddedMetadataPolicy {
@@ -345,6 +372,7 @@ pub enum EmbeddedMetadataPolicy {
     Strip,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ColorProfilePolicy {
@@ -353,6 +381,7 @@ pub enum ColorProfilePolicy {
     StripAfterConversion,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", content = "path", rename_all = "snake_case")]
 pub enum ProcessingReportPolicy {
@@ -360,6 +389,7 @@ pub enum ProcessingReportPolicy {
     Json(String),
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SchedulingHint {

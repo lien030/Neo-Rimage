@@ -38,3 +38,6 @@ zune-image = { version = "0.5.0", features = ["simd"] }
 mozjpeg = { version = "0.10.13", default-features = false, features = ["with_simd"] }
 ravif = { version = "0.13.0", default-features = false }
 jpeg-encoder = { version = "0.7.0", features = ["simd"] }
+
+[dev-dependencies]
+ts-rs = { version = "12.0.1", features = ["serde-json-impl"] }

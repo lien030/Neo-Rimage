@@ -2,6 +2,7 @@ use super::{EncoderKind, IPC_SCHEMA_VERSION, JOB_CONFIG_VERSION};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackendCapabilities {
@@ -36,6 +37,7 @@ impl BackendCapabilities {
     }
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EncoderCapability {
@@ -47,6 +49,7 @@ pub struct EncoderCapability {
     pub limitations: Vec<String>,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OperationKind {
@@ -56,6 +59,7 @@ pub enum OperationKind {
     PremultiplyAlpha,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationCapability {
@@ -66,6 +70,7 @@ pub struct OperationCapability {
     pub limitations: Vec<String>,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OptionCapability {
@@ -80,6 +85,7 @@ pub struct OptionCapability {
     pub conflicts_with: Vec<String>,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OptionValueType {
@@ -90,6 +96,7 @@ pub enum OptionValueType {
     Enum,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OptionConstraints {
@@ -100,6 +107,7 @@ pub struct OptionConstraints {
     pub allowed_values: Vec<Value>,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MetadataCapability {
@@ -109,6 +117,7 @@ pub struct MetadataCapability {
     pub processing_report: bool,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConcurrencyCapability {

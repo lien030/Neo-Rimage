@@ -12,6 +12,9 @@ mod ipc;
 mod progress;
 mod snapshot;
 
+#[cfg(test)]
+mod contracts;
+
 pub use capability::*;
 pub use config::*;
 pub use error::*;
