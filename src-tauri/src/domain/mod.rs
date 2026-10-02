@@ -28,3 +28,6 @@ pub const IPC_SCHEMA_VERSION: u16 = 1;
 
 /// Version of the normalized job configuration stored by JobManager.
 pub const JOB_CONFIG_VERSION: u16 = 1;
+
+pub const DEFAULT_ITEM_PAGE_SIZE: u32 = 200;
+pub const MAX_ITEM_PAGE_SIZE: u32 = 1_000;

@@ -1,5 +1,7 @@
 export const IPC_SCHEMA_VERSION = 1 as const;
 export const JOB_CONFIG_VERSION = 1 as const;
+export const DEFAULT_ITEM_PAGE_SIZE = 200 as const;
+export const MAX_ITEM_PAGE_SIZE = 1000 as const;
 
 export type AppError = { code: ErrorCode, category: ErrorCategory, messageKey: string, messageArgs: { [key in string]: string }, fallbackMessage: string, retryable: boolean, fieldErrors: Array<FieldError>, context: ErrorContext, diagnosticId: DiagnosticId | null, };
 
@@ -29,7 +31,7 @@ export type ConcurrencyCapability = { default: number, minimum: number, maximum:
 
 export type CorrelationId = string;
 
-export type CreateJobCommand = { correlationId: CorrelationId, request: CreateJobRequest, };
+export type CreateJobCommand = { correlationId: CorrelationId, request: CreateJobRequest, includeItems: boolean, };
 
 export type CreateJobRequest = { schemaVersion: number, inputs: Array<InputResource>, operations: Array<Operation>, encoder: EncoderConfig, output: OutputPolicy, metadata: MetadataPolicy, inputAcceptance: InputAcceptancePolicy, scheduling: SchedulingHint | null, };
 

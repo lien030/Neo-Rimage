@@ -46,12 +46,13 @@ pub fn get_backend_snapshot(service: State<'_, BackendService>) -> BackendSnapsh
 pub fn get_job_snapshot(
     service: State<'_, BackendService>,
     job_id: String,
+    offset: Option<u32>,
+    limit: Option<u32>,
 ) -> Result<JobDetailSnapshot, CommandErrorEnvelope> {
     let job_id = JobId::new(job_id);
     let correlation_id = CorrelationId::new(format!("get-job-{job_id}"));
     service
-        .manager()
-        .job_detail_snapshot(&job_id, 0, u32::MAX)
+        .job_detail_snapshot(&job_id, offset, limit)
         .map_err(|error| manager_command_error(correlation_id, error))
 }
 
@@ -256,12 +257,8 @@ fn retry_selection(
         [item_id] => {
             let belongs_to_job = service
                 .manager()
-                .job_detail_snapshot(job_id, 0, u32::MAX)
-                .map_err(|error| manager_command_error(correlation_id.clone(), error))?
-                .items
-                .items
-                .iter()
-                .any(|item| item.id == *item_id);
+                .item_belongs_to_job(job_id, item_id)
+                .map_err(|error| manager_command_error(correlation_id.clone(), error))?;
             if !belongs_to_job {
                 return Err(command_error(
                     correlation_id.clone(),

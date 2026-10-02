@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 import {
   IPC_SCHEMA_VERSION,
+  DEFAULT_ITEM_PAGE_SIZE,
   type BackendCapabilities,
   type BackendSnapshot,
   type CommandAccepted,
@@ -66,8 +67,8 @@ export class BackendClient {
     return this.transport.invoke(BACKEND_COMMANDS.getSnapshot);
   }
 
-  getJobSnapshot(jobId: JobId): Promise<JobDetailSnapshot> {
-    return this.transport.invoke(BACKEND_COMMANDS.getJobSnapshot, { jobId });
+  getJobSnapshot(jobId: JobId, offset = 0, limit: number = DEFAULT_ITEM_PAGE_SIZE): Promise<JobDetailSnapshot> {
+    return this.transport.invoke(BACKEND_COMMANDS.getJobSnapshot, { jobId, offset, limit });
   }
 
   createJob(command: CreateJobCommand): Promise<CreateJobResponse> {
@@ -127,6 +128,7 @@ export function createJobCommand(
 ): CreateJobCommand {
   return {
     correlationId,
+    includeItems: false,
     // Normalize the version at the final IPC boundary so callers cannot send
     // a stale version copied from long-lived editable state.
     request: { ...request, schemaVersion: IPC_SCHEMA_VERSION },

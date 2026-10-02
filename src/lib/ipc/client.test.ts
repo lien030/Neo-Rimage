@@ -98,7 +98,7 @@ describe("BackendClient", () => {
     expect(transport.invocations).toEqual([
       { command: BACKEND_COMMANDS.getCapabilities, args: undefined },
       { command: BACKEND_COMMANDS.getSnapshot, args: undefined },
-      { command: BACKEND_COMMANDS.getJobSnapshot, args: { jobId: "job-1" } },
+      { command: BACKEND_COMMANDS.getJobSnapshot, args: { jobId: "job-1", offset: 0, limit: 200 } },
     ]);
   });
 
@@ -160,6 +160,16 @@ describe("BackendClient", () => {
     ]);
   });
 
+  it("passes explicit job detail page boundaries without reshaping them", async () => {
+    const transport = new RecordingTransport();
+    const client = new BackendClient(transport);
+    await client.getJobSnapshot("job-1", 200, 50);
+    expect(transport.invocations).toEqual([{
+      command: BACKEND_COMMANDS.getJobSnapshot,
+      args: { jobId: "job-1", offset: 200, limit: 50 },
+    }]);
+  });
+
   it("subscribes to the backend state channel without reshaping payloads", async () => {
     const transport = new RecordingTransport();
     const client = new BackendClient(transport);
@@ -182,6 +192,7 @@ describe("createJobCommand", () => {
 
     expect(createJobCommand("correlation-1", staleRequest)).toEqual({
       correlationId: "correlation-1",
+      includeItems: false,
       request: { ...CREATE_JOB_REQUEST, schemaVersion: IPC_SCHEMA_VERSION },
     });
   });

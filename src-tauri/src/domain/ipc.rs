@@ -29,6 +29,12 @@ pub mod command_names {
 pub struct CreateJobCommand {
     pub correlation_id: CorrelationId,
     pub request: CreateJobRequest,
+    #[serde(default = "include_items_by_default")]
+    pub include_items: bool,
+}
+
+fn include_items_by_default() -> bool {
+    true
 }
 
 #[cfg_attr(test, derive(ts_rs::TS))]

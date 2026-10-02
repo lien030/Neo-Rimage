@@ -288,6 +288,7 @@ fn backend_service_wraps_normalization_errors_with_command_correlation() {
         .create_job(CreateJobCommand {
             correlation_id: correlation_id.clone(),
             request: invalid,
+            include_items: true,
         })
         .expect_err("invalid schema");
 
@@ -309,6 +310,7 @@ fn backend_service_processes_a_real_mozjpeg_job_end_to_end() {
     let response = service
         .create_job(CreateJobCommand {
             correlation_id: CorrelationId::new("vertical-request"),
+            include_items: false,
             request: request(
                 vec![InputResource {
                     path: input.to_string_lossy().into_owned(),
@@ -319,6 +321,9 @@ fn backend_service_processes_a_real_mozjpeg_job_end_to_end() {
             ),
         })
         .expect("create job");
+
+    assert!(response.items.is_empty());
+    assert_eq!(response.job.counts.total, 1);
 
     let terminal = service
         .manager()
@@ -463,6 +468,76 @@ fn auto_rename_avoids_an_existing_output_deterministically() {
             .and_then(|name| name.to_str()),
         Some("photo (1).jpg")
     );
+}
+
+#[test]
+fn job_detail_pages_are_bounded_without_changing_retry_ownership() {
+    let directory = TestDirectory::new("detail-pages");
+    let input = directory.path("photo.ppm");
+    fs::write(&input, b"fixture").unwrap();
+    let service = BackendService::new(1).unwrap();
+    service.manager().set_scheduler_paused(true).unwrap();
+    let mut submission = service
+        .normalize_request(request(
+            vec![InputResource {
+                path: input.to_string_lossy().into_owned(),
+                kind: InputResourceKind::File,
+                scan_recursively: false,
+            }],
+            same_directory_output("-copy"),
+        ))
+        .unwrap()
+        .submission;
+    submission.items.resize(1_001, submission.items[0].clone());
+    let other_submission = submission.clone();
+    let job_id = service.manager().submit(submission).unwrap();
+    let other_job_id = service.manager().submit(other_submission).unwrap();
+
+    let first = service.job_detail_snapshot(&job_id, None, None).unwrap();
+    assert_eq!(first.items.items.len(), 200);
+    assert_eq!(first.items.total, 1_001);
+    let maximum = service
+        .job_detail_snapshot(&job_id, Some(0), Some(u32::MAX))
+        .unwrap();
+    assert_eq!(maximum.items.items.len(), 1_000);
+    assert_eq!(maximum.items.limit, 1_000);
+    let last = service
+        .job_detail_snapshot(&job_id, Some(1_000), Some(200))
+        .unwrap();
+    assert_eq!(last.items.items.len(), 1);
+    assert!(service
+        .manager()
+        .item_belongs_to_job(&job_id, &last.items.items[0].id)
+        .unwrap());
+    assert!(!service
+        .manager()
+        .item_belongs_to_job(&other_job_id, &last.items.items[0].id)
+        .unwrap());
+    assert!(service
+        .job_detail_snapshot(&job_id, Some(u32::MAX), Some(200))
+        .unwrap()
+        .items
+        .items
+        .is_empty());
+    assert!(service
+        .job_detail_snapshot(&job_id, Some(0), Some(0))
+        .unwrap()
+        .items
+        .items
+        .is_empty());
+}
+
+#[test]
+fn legacy_creation_commands_still_include_items_by_default() {
+    let command = CreateJobCommand {
+        correlation_id: CorrelationId::new("legacy-request"),
+        request: request(Vec::new(), same_directory_output("-copy")),
+        include_items: true,
+    };
+    let mut value = serde_json::to_value(command).unwrap();
+    value.as_object_mut().unwrap().remove("includeItems");
+    let decoded: CreateJobCommand = serde_json::from_value(value).unwrap();
+    assert!(decoded.include_items);
 }
 
 fn scan_command(paths: Vec<PathBuf>, recursive: bool) -> crate::domain::ScanInputsCommand {

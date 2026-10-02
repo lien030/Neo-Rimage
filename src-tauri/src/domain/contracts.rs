@@ -49,7 +49,7 @@ fn generate_contracts() -> String {
     types.visit::<CommandErrorEnvelope>();
 
     let mut output = format!(
-        "export const IPC_SCHEMA_VERSION = {IPC_SCHEMA_VERSION} as const;\nexport const JOB_CONFIG_VERSION = {JOB_CONFIG_VERSION} as const;\n\n"
+        "export const IPC_SCHEMA_VERSION = {IPC_SCHEMA_VERSION} as const;\nexport const JOB_CONFIG_VERSION = {JOB_CONFIG_VERSION} as const;\nexport const DEFAULT_ITEM_PAGE_SIZE = {DEFAULT_ITEM_PAGE_SIZE} as const;\nexport const MAX_ITEM_PAGE_SIZE = {MAX_ITEM_PAGE_SIZE} as const;\n\n"
     );
     for declaration in types.declarations.into_values() {
         output.push_str(&declaration);

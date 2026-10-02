@@ -296,6 +296,19 @@ impl JobManager {
         Ok(snapshot_job(job, state.revision))
     }
 
+    pub fn item_belongs_to_job(
+        &self,
+        job_id: &JobId,
+        item_id: &ItemId,
+    ) -> Result<bool, ManagerError> {
+        let state = lock_state(&self.shared.state);
+        let job = state
+            .jobs
+            .get(job_id)
+            .ok_or_else(|| ManagerError::JobNotFound(job_id.clone()))?;
+        Ok(job.items.iter().any(|item| item.spec.id == *item_id))
+    }
+
     pub fn job_detail_snapshot(
         &self,
         job_id: &JobId,

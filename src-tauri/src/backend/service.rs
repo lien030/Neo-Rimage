@@ -3,11 +3,11 @@ use std::sync::Arc;
 use crate::{
     domain::{
         BackendCapabilities, CommandErrorEnvelope, ConcurrencyCapability, CreateJobCommand,
-        CreateJobResponse, ScanInputsCommand, ScanInputsResponse, IPC_SCHEMA_VERSION,
-        JOB_CONFIG_VERSION,
+        CreateJobResponse, JobDetailSnapshot, JobId, ScanInputsCommand, ScanInputsResponse,
+        DEFAULT_ITEM_PAGE_SIZE, IPC_SCHEMA_VERSION, JOB_CONFIG_VERSION, MAX_ITEM_PAGE_SIZE,
     },
     engine::{engine_capabilities, RIMAGE_SOURCE_REVISION, RIMAGE_SOURCE_VERSION},
-    jobs::JobManager,
+    jobs::{JobManager, ManagerError},
 };
 
 use super::{
@@ -79,6 +79,21 @@ impl BackendService {
             .map_err(|error| command_error(correlation_id, error))
     }
 
+    pub fn job_detail_snapshot(
+        &self,
+        job_id: &JobId,
+        offset: Option<u32>,
+        limit: Option<u32>,
+    ) -> Result<JobDetailSnapshot, ManagerError> {
+        self.manager.job_detail_snapshot(
+            job_id,
+            offset.unwrap_or(0),
+            limit
+                .unwrap_or(DEFAULT_ITEM_PAGE_SIZE)
+                .min(MAX_ITEM_PAGE_SIZE),
+        )
+    }
+
     pub fn create_job(
         &self,
         command: CreateJobCommand,
@@ -95,7 +110,7 @@ impl BackendService {
             .map_err(|error| manager_command_error(correlation_id.clone(), error))?;
         let detail = self
             .manager
-            .job_detail_snapshot(&job_id, 0, u32::MAX)
+            .job_detail_snapshot(&job_id, 0, if command.include_items { u32::MAX } else { 0 })
             .map_err(|error| manager_command_error(correlation_id.clone(), error))?;
 
         Ok(CreateJobResponse {
