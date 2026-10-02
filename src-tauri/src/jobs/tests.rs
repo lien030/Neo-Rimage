@@ -558,6 +558,26 @@ fn bounded_revision_subscription_is_a_snapshot_wakeup_not_an_event_log() {
     let snapshot = manager.snapshot();
     assert!(snapshot.revision >= notified);
     assert_eq!(snapshot.jobs[0], terminal);
+    let (revision, occurred_at) = manager.observation_revision();
+    assert_eq!(revision, snapshot.revision);
+    assert!(occurred_at >= snapshot.generated_at);
+}
+
+#[test]
+fn observation_revision_tracks_paused_manager_changes() {
+    let manager = JobManager::new(Arc::new(ProgressExecutor), 2).expect("create manager");
+    manager.set_scheduler_paused(true).expect("pause manager");
+    let initial_revision = manager.observation_revision().0;
+    manager
+        .submit(submission("revision", 3))
+        .expect("submit job");
+    let submitted_revision = manager.observation_revision().0;
+    assert!(submitted_revision > initial_revision);
+    assert_eq!(submitted_revision, manager.snapshot().revision);
+    manager
+        .set_desired_concurrency(2)
+        .expect("change concurrency");
+    assert!(manager.observation_revision().0 > submitted_revision);
 }
 
 #[test]

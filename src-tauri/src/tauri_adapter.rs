@@ -20,12 +20,9 @@ pub fn spawn_revision_bridge(app: AppHandle, service: BackendService) {
         .name("neo-rimage-event-bridge".to_owned())
         .spawn(move || {
             while subscription.recv().is_ok() {
-                let snapshot = service.manager().snapshot();
-                let envelope = StateEventEnvelope::new(
-                    snapshot.revision,
-                    snapshot.generated_at,
-                    StateEvent::SnapshotInvalidated,
-                );
+                let (revision, occurred_at) = service.manager().observation_revision();
+                let envelope =
+                    StateEventEnvelope::new(revision, occurred_at, StateEvent::SnapshotInvalidated);
                 // Events are bounded dirty hints. A webview that misses one can
                 // always recover from get_backend_snapshot.
                 let _ = app.emit(STATE_EVENT_NAME, envelope);

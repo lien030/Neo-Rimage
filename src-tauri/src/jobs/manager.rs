@@ -273,6 +273,11 @@ impl JobManager {
         snapshot_state(&lock_state(&self.shared.state), generated_at)
     }
 
+    pub fn observation_revision(&self) -> (Revision, TimestampMs) {
+        let state = lock_state(&self.shared.state);
+        (state.revision, self.shared.clock.now_ms())
+    }
+
     /// Subscribe to bounded revision notifications. A full channel keeps its
     /// older notification; this intentionally coalesces bursts because the
     /// receiver must fetch an authoritative snapshot after every wake-up.
