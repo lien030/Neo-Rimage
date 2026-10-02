@@ -16,8 +16,6 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
     "dialog:allow-open",
-    "fs:default",
-    "fs:read-all",
     "core:path:default"
   ]
 }
