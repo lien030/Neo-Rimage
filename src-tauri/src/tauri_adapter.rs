@@ -7,9 +7,10 @@ use crate::{
     domain::{
         AppError, BackendCapabilities, BackendSnapshot, CommandAccepted, CommandErrorEnvelope,
         CorrelationId, CreateJobCommand, CreateJobResponse, ErrorCategory, ItemId, JobCommand,
-        JobCommandResponse, JobDetailSnapshot, JobId, RetryItemsCommand, SchedulerCommandResponse,
-        SetSchedulerPausedCommand, SetWorkerCountCommand, StateEvent, StateEventEnvelope,
-        WorkerCountCommandResponse, IPC_SCHEMA_VERSION, STATE_EVENT_NAME,
+        JobCommandResponse, JobDetailSnapshot, JobId, RetryItemsCommand, ScanInputsCommand,
+        ScanInputsResponse, SchedulerCommandResponse, SetSchedulerPausedCommand,
+        SetWorkerCountCommand, StateEvent, StateEventEnvelope, WorkerCountCommandResponse,
+        IPC_SCHEMA_VERSION, STATE_EVENT_NAME,
     },
     jobs::{ManagerError, RetryMode},
 };
@@ -52,6 +53,28 @@ pub fn get_job_snapshot(
         .manager()
         .job_detail_snapshot(&job_id, 0, u32::MAX)
         .map_err(|error| manager_command_error(correlation_id, error))
+}
+
+#[tauri::command]
+pub async fn scan_inputs(
+    service: State<'_, BackendService>,
+    command: ScanInputsCommand,
+) -> Result<ScanInputsResponse, CommandErrorEnvelope> {
+    let service = service.inner().clone();
+    let correlation_id = command.correlation_id.clone();
+    tauri::async_runtime::spawn_blocking(move || service.scan_inputs(command))
+        .await
+        .map_err(|_| {
+            command_error(
+                correlation_id,
+                AppError::new(
+                    "backend.scan_join_failed",
+                    ErrorCategory::Internal,
+                    "errors.backendScanFailed",
+                    "The backend could not finish scanning the selected inputs.",
+                ),
+            )
+        })?
 }
 
 #[tauri::command]

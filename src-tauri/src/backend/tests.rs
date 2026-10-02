@@ -21,7 +21,7 @@ use crate::{
     },
 };
 
-use super::{BackendService, LocalEngineExecutor, RequestNormalizer};
+use super::{BackendService, LocalEngineExecutor, NormalizationOptions, RequestNormalizer};
 
 struct TestDirectory(PathBuf);
 
@@ -463,6 +463,142 @@ fn auto_rename_avoids_an_existing_output_deterministically() {
             .and_then(|name| name.to_str()),
         Some("photo (1).jpg")
     );
+}
+
+fn scan_command(paths: Vec<PathBuf>, recursive: bool) -> crate::domain::ScanInputsCommand {
+    crate::domain::ScanInputsCommand {
+        schema_version: IPC_SCHEMA_VERSION,
+        correlation_id: CorrelationId::new("scan-request"),
+        paths: paths
+            .into_iter()
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect(),
+        scan_recursively: recursive,
+    }
+}
+
+#[test]
+fn input_preview_reuses_discovery_order_deduplication_and_decoder_whitelist() {
+    let directory = TestDirectory::new("scan-inputs");
+    fs::create_dir_all(directory.path("nested")).unwrap();
+    fs::write(directory.path("photo.PNG"), b"fixture").unwrap();
+    fs::write(directory.path("nested/画像.ppm"), b"fixture").unwrap();
+    fs::write(directory.path("unsupported.avif"), b"fixture").unwrap();
+    let service = BackendService::new(1).unwrap();
+    let initial_revision = service.manager().observation_revision().0;
+    let response = service
+        .scan_inputs(scan_command(
+            vec![
+                directory.path("photo.PNG"),
+                directory.path("./photo.PNG"),
+                directory.path(""),
+                directory.path("unsupported.avif"),
+                directory.path("missing.png"),
+            ],
+            true,
+        ))
+        .unwrap();
+    assert_eq!(response.inputs.len(), 2);
+    assert_eq!(response.inputs[0].file_name, "photo.PNG");
+    #[cfg(windows)]
+    assert_eq!(
+        response.inputs[0].path,
+        directory.path("photo.PNG").to_string_lossy()
+    );
+    assert_eq!(response.inputs[1].file_name, "画像.ppm");
+    assert_eq!(response.rejected_inputs.len(), 2);
+    assert_eq!(
+        response.rejected_inputs[0].error.code.0,
+        "input.extension_unsupported"
+    );
+    assert_eq!(response.rejected_inputs[1].error.code.0, "input.not_found");
+    assert_eq!(response.correlation_id, CorrelationId::new("scan-request"));
+    assert_eq!(service.manager().observation_revision().0, initial_revision);
+    assert!(service.manager().snapshot().jobs.is_empty());
+    assert!(!response.inputs[0].path.starts_with(r"\?\"));
+}
+
+#[test]
+fn input_preview_honors_recursion_and_reports_empty_directories() {
+    let directory = TestDirectory::new("scan-recursion");
+    fs::create_dir_all(directory.path("nested")).unwrap();
+    fs::write(directory.path("nested/photo.ppm"), b"fixture").unwrap();
+    let normalizer = RequestNormalizer::default();
+    let shallow = normalizer
+        .scan_inputs(scan_command(vec![directory.path("")], false))
+        .unwrap();
+    assert!(shallow.inputs.is_empty());
+    assert_eq!(
+        shallow.rejected_inputs[0].error.code.0,
+        "input.directory_no_supported_files"
+    );
+    let recursive = normalizer
+        .scan_inputs(scan_command(vec![directory.path("")], true))
+        .unwrap();
+    assert_eq!(recursive.inputs.len(), 1);
+    assert!(recursive.rejected_inputs.is_empty());
+}
+
+#[test]
+fn input_preview_enforces_the_same_file_and_depth_limits() {
+    let directory = TestDirectory::new("scan-limits");
+    fs::create_dir_all(directory.path("nested")).unwrap();
+    fs::write(directory.path("first.ppm"), b"fixture").unwrap();
+    fs::write(directory.path("second.ppm"), b"fixture").unwrap();
+    fs::write(directory.path("nested/third.ppm"), b"fixture").unwrap();
+    let limited = RequestNormalizer::new(NormalizationOptions {
+        maximum_files: 1,
+        maximum_depth: 64,
+    });
+    let error = limited
+        .scan_inputs(scan_command(vec![directory.path("")], true))
+        .unwrap_err();
+    assert_eq!(error.code.0, "input.file_limit_exceeded");
+    let shallow = RequestNormalizer::new(NormalizationOptions {
+        maximum_files: 2,
+        maximum_depth: 1,
+    });
+    assert_eq!(
+        shallow
+            .scan_inputs(scan_command(vec![directory.path("")], true))
+            .unwrap()
+            .inputs
+            .len(),
+        2
+    );
+}
+
+#[test]
+fn input_preview_checks_the_schema_before_filesystem_access() {
+    let mut command = scan_command(vec![PathBuf::from("missing.png")], false);
+    command.schema_version = 0;
+    let service = BackendService::new(1).unwrap();
+    let error = service.scan_inputs(command).unwrap_err();
+    assert_eq!(error.error.code.0, "protocol.schema_version_unsupported");
+    assert_eq!(error.correlation_id, CorrelationId::new("scan-request"));
+}
+
+#[test]
+fn job_creation_revalidates_inputs_after_a_successful_preview() {
+    let directory = TestDirectory::new("scan-revalidation");
+    let input = directory.path("photo.ppm");
+    fs::write(&input, b"fixture").unwrap();
+    let normalizer = RequestNormalizer::default();
+    let preview = normalizer
+        .scan_inputs(scan_command(vec![input.clone()], false))
+        .unwrap();
+    fs::remove_file(&input).unwrap();
+    let error = normalizer
+        .normalize(request(
+            vec![InputResource {
+                path: preview.inputs[0].path.clone(),
+                kind: InputResourceKind::File,
+                scan_recursively: false,
+            }],
+            same_directory_output("-optimized"),
+        ))
+        .unwrap_err();
+    assert_eq!(error.code.0, "input.discovery_rejected");
 }
 
 struct FakeEngine {

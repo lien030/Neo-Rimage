@@ -35,7 +35,6 @@ import {
   collectImageInputs,
   createTaskInputState,
   createTaskUiState,
-  expandDroppedPaths,
   mergeSelectedInputs,
 } from "./features/create-task";
 
@@ -104,11 +103,10 @@ function App() {
   }
 
   async function handleDroppedPaths(paths: string[]) {
-    const filePaths = await expandDroppedPaths(
+    const inputs = await collectImageInputs(
       paths,
       SCAN_DROPPED_DIRECTORIES_RECURSIVELY,
     );
-    const inputs = await collectImageInputs(filePaths);
     createTaskInputState.files = mergeSelectedInputs(
       createTaskInputState.files,
       inputs,

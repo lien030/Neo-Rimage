@@ -12,6 +12,7 @@ pub mod command_names {
     pub const GET_BACKEND_CAPABILITIES: &str = "get_backend_capabilities";
     pub const GET_BACKEND_SNAPSHOT: &str = "get_backend_snapshot";
     pub const GET_JOB_SNAPSHOT: &str = "get_job_snapshot";
+    pub const SCAN_INPUTS: &str = "scan_inputs";
     pub const CREATE_JOB: &str = "create_job";
     pub const PAUSE_JOB: &str = "pause_job";
     pub const RESUME_JOB: &str = "resume_job";
@@ -28,6 +29,35 @@ pub mod command_names {
 pub struct CreateJobCommand {
     pub correlation_id: CorrelationId,
     pub request: CreateJobRequest,
+}
+
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanInputsCommand {
+    pub schema_version: u16,
+    pub correlation_id: CorrelationId,
+    pub paths: Vec<String>,
+    #[serde(default)]
+    pub scan_recursively: bool,
+}
+
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoveredInput {
+    pub path: String,
+    pub file_name: String,
+}
+
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanInputsResponse {
+    pub schema_version: u16,
+    pub correlation_id: CorrelationId,
+    pub inputs: Vec<DiscoveredInput>,
+    pub rejected_inputs: Vec<RejectedInput>,
 }
 
 #[cfg_attr(test, derive(ts_rs::TS))]

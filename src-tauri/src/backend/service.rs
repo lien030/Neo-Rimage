@@ -3,7 +3,8 @@ use std::sync::Arc;
 use crate::{
     domain::{
         BackendCapabilities, CommandErrorEnvelope, ConcurrencyCapability, CreateJobCommand,
-        CreateJobResponse, IPC_SCHEMA_VERSION, JOB_CONFIG_VERSION,
+        CreateJobResponse, ScanInputsCommand, ScanInputsResponse, IPC_SCHEMA_VERSION,
+        JOB_CONFIG_VERSION,
     },
     engine::{engine_capabilities, RIMAGE_SOURCE_REVISION, RIMAGE_SOURCE_VERSION},
     jobs::JobManager,
@@ -66,6 +67,16 @@ impl BackendService {
         request: crate::domain::CreateJobRequest,
     ) -> Result<NormalizedJob, crate::domain::AppError> {
         self.normalizer.normalize(request)
+    }
+
+    pub fn scan_inputs(
+        &self,
+        command: ScanInputsCommand,
+    ) -> Result<ScanInputsResponse, CommandErrorEnvelope> {
+        let correlation_id = command.correlation_id.clone();
+        self.normalizer
+            .scan_inputs(command)
+            .map_err(|error| command_error(correlation_id, error))
     }
 
     pub fn create_job(

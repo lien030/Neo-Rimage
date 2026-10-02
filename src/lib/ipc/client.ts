@@ -13,6 +13,8 @@ import {
   type JobId,
   type JobSnapshot,
   type RetryItemsCommand,
+  type ScanInputsCommand,
+  type ScanInputsResponse,
   type SchedulerSnapshot,
   type SetSchedulerPausedCommand,
   type SetWorkerCountCommand,
@@ -28,6 +30,7 @@ export const BACKEND_COMMANDS = {
   getSnapshot: "get_backend_snapshot",
   getJobSnapshot: "get_job_snapshot",
   createJob: "create_job",
+  scanInputs: "scan_inputs",
   pauseJob: "pause_job",
   resumeJob: "resume_job",
   cancelJob: "cancel_job",
@@ -69,6 +72,10 @@ export class BackendClient {
 
   createJob(command: CreateJobCommand): Promise<CreateJobResponse> {
     return this.transport.invoke(BACKEND_COMMANDS.createJob, { command });
+  }
+
+  scanInputs(command: ScanInputsCommand): Promise<ScanInputsResponse> {
+    return this.transport.invoke(BACKEND_COMMANDS.scanInputs, { command });
   }
 
   pauseJob(command: JobCommand): Promise<CommandAccepted<JobSnapshot>> {

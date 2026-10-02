@@ -8,9 +8,10 @@ use walkdir::WalkDir;
 
 use crate::{
     domain::{
-        AppError, BackupPolicy, CollisionPolicy, CreateJobRequest, ErrorCategory, ErrorContext,
-        InputAcceptancePolicy, InputResource, InputResourceKind, ItemId, ItemSpec, JobId, JobSpec,
-        OutputLocation, OutputPlan, RejectedInput, TimestampMs, IPC_SCHEMA_VERSION,
+        AppError, BackupPolicy, CollisionPolicy, CreateJobRequest, DiscoveredInput, ErrorCategory,
+        ErrorContext, InputAcceptancePolicy, InputResource, InputResourceKind, ItemId, ItemSpec,
+        JobId, JobSpec, OutputLocation, OutputPlan, RejectedInput, ScanInputsCommand,
+        ScanInputsResponse, TimestampMs, IPC_SCHEMA_VERSION,
     },
     engine::encoder_output_extension,
     jobs::JobSubmission,
@@ -51,6 +52,47 @@ impl Default for RequestNormalizer {
 impl RequestNormalizer {
     pub fn new(options: NormalizationOptions) -> Self {
         Self { options }
+    }
+
+    pub fn scan_inputs(&self, command: ScanInputsCommand) -> Result<ScanInputsResponse, AppError> {
+        validate_schema(command.schema_version)?;
+        let resources: Vec<_> = command
+            .paths
+            .iter()
+            .map(|path| InputResource {
+                kind: if fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir()) {
+                    InputResourceKind::Directory
+                } else {
+                    InputResourceKind::File
+                },
+                path: path.clone(),
+                scan_recursively: command.scan_recursively,
+            })
+            .collect();
+        let (candidates, rejected_inputs) = self.discover_inputs(&resources)?;
+        let inputs = candidates
+            .into_iter()
+            .map(|candidate| {
+                let path = candidate.path.to_string_lossy().into_owned();
+                #[cfg(windows)]
+                let path = windows_path_spelling(&path);
+                DiscoveredInput {
+                    path,
+                    file_name: candidate
+                        .path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .into_owned(),
+                }
+            })
+            .collect();
+        Ok(ScanInputsResponse {
+            schema_version: IPC_SCHEMA_VERSION,
+            correlation_id: command.correlation_id,
+            inputs,
+            rejected_inputs,
+        })
     }
 
     pub fn normalize(&self, request: CreateJobRequest) -> Result<NormalizedJob, AppError> {
@@ -253,17 +295,22 @@ impl OutputReservations {
     }
 }
 
-fn validate_request_shape(request: &CreateJobRequest) -> Result<(), AppError> {
-    if request.schema_version != IPC_SCHEMA_VERSION {
+fn validate_schema(received: u16) -> Result<(), AppError> {
+    if received != IPC_SCHEMA_VERSION {
         return Err(AppError::new(
             "protocol.schema_version_unsupported",
             ErrorCategory::Protocol,
             "errors.schemaVersionUnsupported",
             "The request schema version is not supported by this backend.",
         )
-        .with_message_arg("received", request.schema_version.to_string())
+        .with_message_arg("received", received.to_string())
         .with_message_arg("supported", IPC_SCHEMA_VERSION.to_string()));
     }
+    Ok(())
+}
+
+fn validate_request_shape(request: &CreateJobRequest) -> Result<(), AppError> {
+    validate_schema(request.schema_version)?;
     if request.inputs.is_empty() {
         return Err(AppError::new(
             "input.empty",

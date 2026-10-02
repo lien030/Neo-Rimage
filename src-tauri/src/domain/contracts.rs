@@ -37,6 +37,8 @@ fn generate_contracts() -> String {
     types.visit::<JobDetailSnapshot>();
     types.visit::<CreateJobCommand>();
     types.visit::<CreateJobResponse>();
+    types.visit::<ScanInputsCommand>();
+    types.visit::<ScanInputsResponse>();
     types.visit::<JobCommand>();
     types.visit::<RetryItemsCommand>();
     types.visit::<SetSchedulerPausedCommand>();

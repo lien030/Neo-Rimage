@@ -1,47 +1,24 @@
-import { invoke } from "@tauri-apps/api/core";
-import { basename } from "@tauri-apps/api/path";
-import { stat } from "@tauri-apps/plugin-fs";
-import mime from "mime";
+import { backendClient, generateCorrelationId, IPC_SCHEMA_VERSION } from "@/lib/ipc";
 
 export interface SelectedInputFile {
   readonly path: string;
   readonly fileName: string;
 }
 
-export async function expandDroppedPaths(
-  paths: readonly string[],
-  scanRecursively = false,
-): Promise<string[]> {
-  const filePaths: string[] = [];
-
-  for (const path of paths) {
-    const fileInfo = await stat(path);
-    if (fileInfo.isFile) {
-      filePaths.push(path);
-    } else if (fileInfo.isDirectory && scanRecursively) {
-      // Directory traversal stays behind the compatibility backend command so
-      // platform filesystem behavior is not reimplemented in the UI.
-      const scannedPaths = await invoke<string[]>("scan_dir", { path });
-      filePaths.push(...scannedPaths);
-    }
-  }
-
-  return filePaths;
-}
-
 export async function collectImageInputs(
   paths: readonly string[],
+  scanRecursively = false,
 ): Promise<SelectedInputFile[]> {
-  const inputs = await Promise.all(
-    paths.map(async (path): Promise<SelectedInputFile | null> => {
-      const fileName = await basename(path);
-      const mimeType = mime.getType(fileName);
-
-      return mimeType?.startsWith("image/") ? { path, fileName } : null;
-    }),
-  );
-
-  return inputs.filter((input): input is SelectedInputFile => input !== null);
+  const response = await backendClient.scanInputs({
+    schemaVersion: IPC_SCHEMA_VERSION,
+    correlationId: generateCorrelationId("scan"),
+    paths: [...paths],
+    scanRecursively,
+  });
+  if (response.schemaVersion !== IPC_SCHEMA_VERSION) {
+    throw new Error("Input scan uses unsupported schema version " + response.schemaVersion + ".");
+  }
+  return response.inputs;
 }
 
 export function mergeSelectedInputs(

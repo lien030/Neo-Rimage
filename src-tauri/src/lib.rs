@@ -17,7 +17,6 @@ use std::{
 use backend::BackendService;
 use sysinfo::System;
 use tauri::Manager;
-use walkdir::WalkDir;
 #[cfg(target_os = "macos")]
 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 #[cfg(target_os = "windows")]
@@ -62,8 +61,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            get_cpus,
-            scan_dir,
+            tauri_adapter::scan_inputs,
             tauri_adapter::get_backend_capabilities,
             tauri_adapter::get_backend_snapshot,
             tauri_adapter::get_job_snapshot,
@@ -91,25 +89,6 @@ pub fn run() {
     });
 }
 
-#[tauri::command]
-fn get_cpus() -> usize {
-    available_physical_cores()
-}
-
 fn available_physical_cores() -> usize {
     System::physical_core_count().unwrap_or(2).max(1)
-}
-
-/// Compatibility scanner retained until drag/drop is fully moved to the
-/// formal scan_inputs contract. Errors are skipped instead of panicking the
-/// Tauri process.
-#[tauri::command]
-fn scan_dir(path: &str) -> Vec<String> {
-    WalkDir::new(path)
-        .follow_links(false)
-        .into_iter()
-        .filter_map(Result::ok)
-        .filter(|entry| entry.file_type().is_file())
-        .map(|entry| entry.path().display().to_string())
-        .collect()
 }

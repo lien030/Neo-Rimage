@@ -37,6 +37,8 @@ export type CreateJobResponse = { schemaVersion: number, correlationId: Correlat
 
 export type DiagnosticId = string;
 
+export type DiscoveredInput = { path: string, fileName: string, };
+
 export type DitherOperation = { strength: number | null, };
 
 export type EmbeddedMetadataPolicy = "preserve_when_supported" | "strip";
@@ -148,6 +150,10 @@ export type ResultSummary = { totalInputBytes: number, totalOutputBytes: number,
 export type RetryItemsCommand = { schemaVersion: number, correlationId: CorrelationId, jobId: JobId, itemIds: Array<ItemId>, includeCancelled: boolean, };
 
 export type Revision = number;
+
+export type ScanInputsCommand = { schemaVersion: number, correlationId: CorrelationId, paths: Array<string>, scanRecursively: boolean, };
+
+export type ScanInputsResponse = { schemaVersion: number, correlationId: CorrelationId, inputs: Array<DiscoveredInput>, rejectedInputs: Array<RejectedInput>, };
 
 export type SchedulerMode = "running" | "paused" | "shutting_down";
 

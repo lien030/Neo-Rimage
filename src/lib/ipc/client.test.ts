@@ -74,6 +74,19 @@ const CREATE_JOB_REQUEST: CreateJobRequest = {
 };
 
 describe("BackendClient", () => {
+  it("keeps input scan arguments in the versioned command envelope", async () => {
+    const transport = new RecordingTransport();
+    const client = new BackendClient(transport);
+    const command = {
+      schemaVersion: IPC_SCHEMA_VERSION,
+      correlationId: "scan-test",
+      paths: ["/images"],
+      scanRecursively: true,
+    };
+    await client.scanInputs(command);
+    expect(transport.invocations).toEqual([{ command: BACKEND_COMMANDS.scanInputs, args: { command } }]);
+  });
+
   it("uses the exact read command names and argument casing", async () => {
     const transport = new RecordingTransport();
     const client = new BackendClient(transport);
