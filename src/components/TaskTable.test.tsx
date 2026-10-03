@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import i18n from "@/i18n/config";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { BackendSyncStatus, JobSnapshot, JobStatus } from "@/lib/ipc";
 
@@ -8,9 +9,9 @@ import TaskTable from "./TaskTable";
 
 const mocks = vi.hoisted(() => ({ useBackendRuntimeState: vi.fn() }));
 
-vi.mock("@/features/backend", () => mocks);
-vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => `translated:${key}` }),
+vi.mock("@/features/backend", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/features/backend")>(),
+  ...mocks,
 }));
 
 function job(status: JobStatus, totalItems = 1, completedItems = 0): JobSnapshot {
@@ -52,6 +53,10 @@ function renderTable(
 }
 
 describe("TaskTable", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
   it("keeps the fixed four-column layout and scrollable sticky header", () => {
     const markup = renderTable([job("queued")]);
     const headers = markup.match(/<th\b[^>]*>/g) ?? [];
@@ -69,8 +74,8 @@ describe("TaskTable", () => {
     expect(markup).toContain("min-width:462px");
     expect(markup).toContain("h-full overflow-auto");
     expect(markup).toContain("sticky top-0 z-10 bg-background drop-shadow");
-    expect(markup).toContain("translated:file");
-    expect(markup).toContain("translated:options");
+    expect(markup).toContain("File");
+    expect(markup).toContain("Options");
     expect(markup).toContain("Progress");
     expect(markup).toContain("mozjpeg · job-queued");
     expect(markup).toContain("1 item</p>");
@@ -117,5 +122,35 @@ describe("TaskTable", () => {
     expect(markup).toContain("100% · 2/1");
     expect(markup).toContain("3 items</p>");
     expect(markup).toContain("Cannot write output");
+  });
+
+  it.each([
+    ["zh", "进度", "暂无任务。", "排队中", "3 项"],
+    ["ja", "進捗", "タスクはありません。", "待機中", "3 件"],
+  ])("renders headings, empty states, counts and statuses in %s", async (
+    language, progress, empty, status, count,
+  ) => {
+    await i18n.changeLanguage(language);
+    expect(renderTable()).toContain(empty);
+    const markup = renderTable([job("queued", 3)]);
+    expect(markup).toContain(progress);
+    expect(markup).toContain(status);
+    expect(markup).toContain(count);
+    expect(markup).not.toContain(">Progress</th>");
+    expect(markup).not.toContain("3 items</p>");
+  });
+
+  it.each(["en", "zh", "ja"])("localizes structured job errors in %s", async (language) => {
+    await i18n.changeLanguage(language);
+    const failed = job("failed");
+    failed.error = {
+      code: "decode_failed", category: "input", messageKey: "errors.decodeFailed",
+      messageArgs: {}, fallbackMessage: "Original backend diagnostic", retryable: false,
+      fieldErrors: [], diagnosticId: null,
+      context: { jobId: failed.id, itemId: null, stage: null, path: null },
+    };
+    const markup = renderTable([failed]);
+    expect(markup).toContain(i18n.t("errors.decodeFailed"));
+    expect(markup).not.toContain("Original backend diagnostic");
   });
 });

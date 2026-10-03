@@ -225,4 +225,48 @@ describe("backend runtime", () => {
     expect(mocks.getSnapshot).not.toHaveBeenCalled();
     cleanup?.();
   });
+
+  it.each([
+    ["en", "The input is damaged or uses an unsupported image format."],
+    ["zh", "输入文件已损坏或使用了不支持的图像格式。"],
+    ["ja", "入力ファイルが破損しているか、対応していない画像形式です。"],
+  ])("formats direct and wrapped backend errors in %s", async (language, expected) => {
+    const i18n = (await import("@/i18n/config")).default;
+    await i18n.changeLanguage(language);
+    const error = { messageKey: "errors.decodeFailed", fallbackMessage: "Original diagnostic" };
+    expect(runtime.formatBackendError(error)).toBe(expected);
+    expect(runtime.formatBackendError({ error })).toBe(expected);
+    expect(runtime.formatBackendError(null)).toBe(i18n.t("backendRequestFailed"));
+    expect(runtime.formatBackendError({
+      messageKey: "errors.futureUnknown", fallbackMessage: "Unknown codec detail",
+    })).toBe("Unknown codec detail");
+    expect(runtime.formatBackendError(new Error("Native diagnostic"))).toBe("Native diagnostic");
+    expect(runtime.formatBackendError({
+      error: { messageKey: "errors.futureUnknown" }, message: "Wrapper diagnostic",
+    })).toBe("Wrapper diagnostic");
+    const schemaError = Object.assign(new Error("Native schema diagnostic"), {
+      messageKey: "errors.schemaVersionUnsupported",
+    });
+    expect(runtime.formatBackendError(schemaError)).toBe(i18n.t("errors.schemaVersionUnsupported"));
+  });
+
+  it("retains error keys for retranslation and clears them after recovery", async () => {
+    const i18n = (await import("@/i18n/config")).default;
+    await i18n.changeLanguage("zh");
+    const error = { messageKey: "errors.decodeFailed", fallbackMessage: "Original diagnostic" };
+    mocks.listenToStateEvents.mockRejectedValueOnce(error);
+    runtime.useBackendRuntimeSync();
+    await vi.waitFor(() => expect(runtime.backendRuntimeState.syncStatus).toBe("unavailable"));
+    expect(runtime.backendRuntimeState.lastErrorDetails).toBe(error);
+    expect(mocks.toastError).toHaveBeenCalledWith("后端不可用", {
+      description: i18n.t("errors.decodeFailed"),
+    });
+    await i18n.changeLanguage("ja");
+    expect(runtime.formatBackendError(runtime.backendRuntimeState.lastErrorDetails)).toBe(
+      i18n.t("errors.decodeFailed"),
+    );
+    await runtime.refreshBackendSnapshot();
+    expect(runtime.backendRuntimeState.lastErrorDetails).toBeNull();
+    cleanup?.();
+  });
 });

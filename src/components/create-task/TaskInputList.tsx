@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -54,6 +55,7 @@ function TaskInputRow({
   disabled: boolean;
   onRemove: (path: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="grid h-7 w-full grid-cols-[minmax(0,1fr)_20px] gap-1 px-2 py-1 hover:bg-slate-100">
       <Tooltip>
@@ -74,6 +76,8 @@ function TaskInputRow({
           disabled={disabled}
           className="m-0 h-full p-0"
           onClick={() => onRemove(task.path)}
+          aria-label={t("removeInput")}
+          title={t("removeInput")}
         >
           <X
             size={16}

@@ -2,7 +2,7 @@
 
 **Local image conversion and optimization, with a desktop interface.**
 
-**English** | [简体中文](README.zh-CN.md)
+**English** | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
 neo-rimage is a desktop app for batch image conversion, compression, and resizing, built with **Tauri, React, and Rust**. Choose an encoder, configure the output, and process your images through a visible task queue.
 

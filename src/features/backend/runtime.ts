@@ -1,8 +1,10 @@
 import { useEffect } from "react";
-import { proxy, useSnapshot } from "valtio";
+import { proxy, ref, useSnapshot } from "valtio";
+import type { TOptions } from "i18next";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { toast } from "sonner";
 
+import i18n from "@/i18n/config";
 import {
   backendClient,
   classifyRevision,
@@ -22,6 +24,7 @@ interface BackendRuntimeState {
   syncStatus: BackendSyncStatus;
   lastAppliedRevision: Revision;
   lastError: string | null;
+  lastErrorDetails: unknown;
 }
 
 interface BackendCommandState {
@@ -35,6 +38,7 @@ export const backendRuntimeState = proxy<BackendRuntimeState>({
   syncStatus: "idle",
   lastAppliedRevision: 0,
   lastError: null,
+  lastErrorDetails: null,
 });
 
 export const backendCommandState = proxy<BackendCommandState>({
@@ -56,8 +60,9 @@ let requestedRevision: Revision = 0;
 
 function assertSchemaVersion(schemaVersion: number, source: string): void {
   if (schemaVersion !== IPC_SCHEMA_VERSION) {
-    throw new Error(
-      `${source} uses unsupported schema version ${schemaVersion}.`,
+    throw Object.assign(
+      new Error(`${source} uses unsupported schema version ${schemaVersion}.`),
+      { messageKey: "errors.schemaVersionUnsupported" },
     );
   }
 }
@@ -77,6 +82,7 @@ function applySnapshot(snapshot: BackendSnapshot): void {
   backendRuntimeState.lastAppliedRevision = snapshot.revision;
   backendRuntimeState.syncStatus = "ready";
   backendRuntimeState.lastError = null;
+  backendRuntimeState.lastErrorDetails = null;
 }
 
 export async function refreshBackendCapabilities(): Promise<BackendCapabilities> {
@@ -140,29 +146,45 @@ async function handleStateEvent(event: StateEventEnvelope): Promise<void> {
   await refreshBackendSnapshot(event.revision);
 }
 
-export function formatBackendError(error: unknown): string {
+export function formatBackendError(
+  error: unknown,
+  translate: (key: string, options?: TOptions) => string = i18n.t,
+  fallbackKey = "backendRequestFailed",
+): string {
   if (typeof error === "string") {
     return error;
   }
 
-  if (error instanceof Error) {
-    return error.message;
-  }
-
   if (error && typeof error === "object") {
     const value = error as {
-      error?: { fallbackMessage?: unknown };
+      error?: {
+        messageKey?: unknown;
+        messageArgs?: unknown;
+        fallbackMessage?: unknown;
+        message?: unknown;
+      };
+      messageKey?: unknown;
+      messageArgs?: unknown;
       fallbackMessage?: unknown;
       message?: unknown;
     };
+    const appError =
+      value.error && typeof value.error === "object" ? value.error : value;
     const message =
-      value.error?.fallbackMessage ?? value.fallbackMessage ?? value.message;
+      appError.fallbackMessage ?? appError.message ?? value.fallbackMessage ?? value.message;
+    if (typeof appError.messageKey === "string") {
+      const args = appError.messageArgs;
+      return translate(appError.messageKey, {
+        ...(args && typeof args === "object" && !Array.isArray(args) ? args : {}),
+        defaultValue: typeof message === "string" ? message : translate(fallbackKey),
+      });
+    }
     if (typeof message === "string") {
       return message;
     }
   }
 
-  return "The backend request failed.";
+  return translate(fallbackKey);
 }
 
 function reportBackendError(
@@ -173,7 +195,9 @@ function reportBackendError(
   const message = formatBackendError(error);
   backendRuntimeState.syncStatus = syncStatus;
   backendRuntimeState.lastError = message;
-  toast.error(title, { description: message });
+  backendRuntimeState.lastErrorDetails =
+    error && typeof error === "object" ? ref(error) : error;
+  toast.error(i18n.t(title), { description: message });
 }
 
 export function useBackendRuntimeSync(): void {
@@ -183,6 +207,7 @@ export function useBackendRuntimeSync(): void {
 
     backendRuntimeState.syncStatus = "syncing";
     backendRuntimeState.lastError = null;
+    backendRuntimeState.lastErrorDetails = null;
 
     const start = async () => {
       unlisten = await backendClient.listenToStateEvents((event) => {
@@ -196,7 +221,7 @@ export function useBackendRuntimeSync(): void {
           }
           reportBackendError(
             "needs_resync",
-            "Backend synchronization failed",
+            "backendSynchronizationFailed",
             error,
           );
         });
@@ -218,7 +243,7 @@ export function useBackendRuntimeSync(): void {
       if (disposed) {
         return;
       }
-      reportBackendError("unavailable", "Backend unavailable", error);
+      reportBackendError("unavailable", "backendUnavailable", error);
     });
 
     return () => {

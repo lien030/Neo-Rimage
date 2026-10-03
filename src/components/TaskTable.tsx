@@ -13,7 +13,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useBackendRuntimeState } from "@/features/backend";
+import { formatBackendError, useBackendRuntimeState } from "@/features/backend";
 import type { JobStatus } from "@/lib/ipc";
 
 type ObservedBackendState = ReturnType<typeof useBackendRuntimeState>;
@@ -32,13 +32,6 @@ const STATUS_LAMP_CLASSES: Record<JobStatus, string> = {
   cancelled: "bg-zinc-500",
 };
 
-function statusLabel(status: JobStatus) {
-  return status
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
 function jobProgress(job: ObservedJobSnapshot) {
   if (job.progress.totalItems === 0) {
     return "—";
@@ -56,8 +49,10 @@ export default function TaskTable() {
   const jobs = backend.snapshot?.jobs ?? [];
   const emptyMessage =
     backend.syncStatus === "ready"
-      ? "No backend jobs."
-      : backend.lastError ?? "Synchronizing backend jobs…";
+      ? t("noJobs")
+      : backend.lastError
+        ? formatBackendError(backend.lastErrorDetails ?? backend.lastError, t)
+        : t("synchronizingJobs");
 
   return (
     <div className="min-h-0 w-full flex-1 overflow-hidden rounded-lg border bg-background">
@@ -73,7 +68,7 @@ export default function TaskTable() {
               style={{ width: 32, minWidth: 32, maxWidth: 32 }}
             />
             <TableHead style={{ minWidth: 160 }}>{t("file")}</TableHead>
-            <TableHead style={{ minWidth: 130 }}>Progress</TableHead>
+            <TableHead style={{ minWidth: 130 }}>{t("progress")}</TableHead>
             <TableHead style={{ minWidth: 140 }}>{t("options")}</TableHead>
           </TableRow>
         </TableHeader>
@@ -99,7 +94,7 @@ export default function TaskTable() {
                           {job.encoder} · {job.id}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {job.counts.total} item{job.counts.total === 1 ? "" : "s"}
+                          {t("itemCount", { count: job.counts.total })}
                         </p>
                       </div>
                     </TooltipTrigger>
@@ -113,10 +108,10 @@ export default function TaskTable() {
                 </TableCell>
                 <TableCell style={{ minWidth: 140 }}>
                   <div className="min-w-0">
-                    <p className="text-sm">{statusLabel(job.status)}</p>
+                    <p className="text-sm">{t("jobStatus." + job.status)}</p>
                     {job.error && (
                       <p className="text-xs text-red-500 truncate">
-                        {job.error.fallbackMessage}
+                        {formatBackendError(job.error, t)}
                       </p>
                     )}
                   </div>

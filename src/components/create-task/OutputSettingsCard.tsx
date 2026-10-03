@@ -65,6 +65,7 @@ export function OutputSettingsCard({
 
     try {
       const selected = await open({
+        title: t("selectDirectory"),
         directory: true,
         multiple: false,
         defaultPath: output.outputDirectory || undefined,
@@ -85,7 +86,9 @@ export function OutputSettingsCard({
       });
     } catch {
       if (createTaskUiState.isOpen && !createTaskUiState.isSubmitting) {
-        createTaskUiState.globalError = t("createTaskErrorDirectoryPicker");
+        createTaskUiState.globalError = {
+          messageKey: "createTaskErrorDirectoryPicker",
+        };
       }
     }
   }

@@ -16,7 +16,10 @@ export async function collectImageInputs(
     scanRecursively,
   });
   if (response.schemaVersion !== IPC_SCHEMA_VERSION) {
-    throw new Error("Input scan uses unsupported schema version " + response.schemaVersion + ".");
+    throw Object.assign(
+      new Error("Input scan uses unsupported schema version " + response.schemaVersion + "."),
+      { messageKey: "errors.schemaVersionUnsupported" },
+    );
   }
   return response.inputs;
 }

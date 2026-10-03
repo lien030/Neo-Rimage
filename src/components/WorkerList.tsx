@@ -1,4 +1,6 @@
-import { useBackendRuntimeState } from "@/features/backend";
+import { useTranslation } from "react-i18next";
+
+import { formatBackendError, useBackendRuntimeState } from "@/features/backend";
 import type {
   ItemProgress,
   ProcessingStage,
@@ -21,32 +23,37 @@ const STATUS_LAMP_CLASSES: Record<WorkerSlotStatus, string> = {
 function formatWorkerActivity(
   progress: ItemProgress | null,
   stage: ProcessingStage | null,
+  translate: (key: string) => string,
 ) {
   if (!progress) {
-    return stage;
+    return stage ? translate("processingStage." + stage) : null;
   }
 
   if (progress.measure.kind === "fraction" && progress.measure.total > 0) {
     const percent = Math.round(
       (progress.measure.completed / progress.measure.total) * 100,
     );
-    return `${progress.stage} · ${Math.min(percent, 100)}%`;
+    return `${translate("processingStage." + progress.stage)} · ${Math.min(percent, 100)}%`;
   }
 
-  return progress.stage;
+  return translate("processingStage." + progress.stage);
 }
 
-function workerItemLabel(worker: WorkerSlotSnapshot): string {
+function workerItemLabel(
+  worker: WorkerSlotSnapshot,
+  translate: (key: string) => string,
+): string {
   if (worker.inputPath) {
     return inputFileName(worker.inputPath);
   }
   if (worker.itemId) {
     return `#${worker.itemId.slice(0, 8)}`;
   }
-  return worker.status === "draining" ? "Draining" : "Idle";
+  return translate("workerStatus." + worker.status);
 }
 
 export default function WorkerList() {
+  const { t } = useTranslation();
   const backend = useBackendRuntimeState();
   const workers = backend.snapshot?.workerSlots ?? [];
 
@@ -56,8 +63,10 @@ export default function WorkerList() {
         {workers.length === 0 && (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             {backend.syncStatus === "ready"
-              ? "No worker slots"
-              : backend.lastError ?? "Synchronizing workers…"}
+              ? t("noWorkers")
+              : backend.lastError
+                ? formatBackendError(backend.lastErrorDetails ?? backend.lastError, t)
+                : t("synchronizingWorkers")}
           </div>
         )}
         {workers.map((worker) => (
@@ -69,14 +78,16 @@ export default function WorkerList() {
 }
 
 function WorkerCard({ worker }: { worker: WorkerSlotSnapshot }) {
-  const activity = formatWorkerActivity(worker.progress, worker.stage);
-  const itemLabel = workerItemLabel(worker);
+  const { t } = useTranslation();
+  const activity = formatWorkerActivity(worker.progress, worker.stage, t);
+  const itemLabel = workerItemLabel(worker, t);
 
   return (
     <div className="grid min-h-12 w-full grid-cols-[36px_minmax(0,1fr)] rounded-sm border border-zinc-300 bg-muted-foreground/5">
       <figure className="flex items-center justify-center">
         <div
           className={`h-2 w-2 rounded-full ${STATUS_LAMP_CLASSES[worker.status]}`}
+          title={t("workerStatus." + worker.status)}
         />
       </figure>
       <div className="flex min-w-0 flex-col justify-center overflow-hidden py-1">

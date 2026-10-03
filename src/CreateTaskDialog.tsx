@@ -1,7 +1,7 @@
 import { AlertCircle, Settings } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useSnapshot } from "valtio";
+import { ref, useSnapshot } from "valtio";
 
 import { OutputSettingsCard } from "@/components/create-task/OutputSettingsCard";
 import { ResizeSettingsCard } from "@/components/create-task/ResizeSettingsCard";
@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { BackendSyncStatus } from "@/features/backend";
-import { useBackendRuntimeState } from "@/features/backend";
+import { formatBackendError, useBackendRuntimeState } from "@/features/backend";
 import {
   CreateTaskValidationError,
   buildCreateJobRequest,
@@ -36,6 +36,7 @@ interface CreateTaskBackendState {
   readonly capabilities: BackendCapabilities | null;
   readonly syncStatus: BackendSyncStatus;
   readonly lastError: string | null;
+  readonly lastErrorDetails: unknown;
 }
 
 export default function CreateTaskDialog() {
@@ -134,7 +135,9 @@ export default function CreateTaskDialog() {
         error instanceof CreateTaskValidationError &&
         error.code === "inputs_required"
           ? null
-          : createTaskErrorMessage(error, t);
+          : error && typeof error === "object"
+            ? ref(error)
+            : error;
     } finally {
       createTaskUiState.isSubmitting = false;
     }
@@ -185,7 +188,11 @@ export default function CreateTaskDialog() {
               <EncoderTabs
                 capabilities={encoderCapabilities}
                 syncStatus={backend.syncStatus}
-                lastError={backend.lastError}
+                lastError={
+                  backend.lastError
+                    ? formatBackendError(backend.lastErrorDetails ?? backend.lastError, t)
+                    : null
+                }
               />
 
               <div className="grid min-h-0 min-w-0 grid-cols-[clamp(180px,26%,256px)_minmax(0,1fr)] gap-3">
@@ -201,14 +208,14 @@ export default function CreateTaskDialog() {
           </div>
         </div>
 
-        {ui.globalError && (
+        {ui.globalError !== null && (
           <DialogFooter className="max-h-12 shrink-0 overflow-y-auto pr-1 sm:justify-start">
             <div
               role="alert"
               className="flex min-w-0 items-start gap-2 text-xs text-destructive"
             >
               <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <p className="min-w-0 break-words">{ui.globalError}</p>
+              <p className="min-w-0 break-words">{createTaskErrorMessage(ui.globalError, t)}</p>
             </div>
           </DialogFooter>
         )}

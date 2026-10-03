@@ -124,7 +124,7 @@ export default function MozjpegTab({
           <SelectContent>
             <SelectItem value="ycbcr">YCbCr</SelectItem>
             <SelectItem value="rgb">RGB</SelectItem>
-            <SelectItem value="grayscale">Grayscale</SelectItem>
+            <SelectItem value="grayscale">{t("grayscale")}</SelectItem>
           </SelectContent>
         </Select>
       </TabCard>
@@ -159,7 +159,7 @@ export default function MozjpegTab({
             <SelectItem value="default">{t("encoderDefault")}</SelectItem>
             {QUANTIZATION_TABLES.map((table) => (
               <SelectItem key={table.value} value={table.value}>
-                {table.label}
+                {table.value === "flat" ? t("quantizationTableFlat") : table.label}
               </SelectItem>
             ))}
           </SelectContent>

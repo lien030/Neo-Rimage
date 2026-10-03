@@ -41,7 +41,7 @@ import {
 const SCAN_DROPPED_DIRECTORIES_RECURSIVELY = true;
 
 function App() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [dragOverlayVisible, setDragOverlayVisible] = useState(false);
   const backend = useBackendRuntimeState();
   const backendCommands = useBackendCommandState();
@@ -56,10 +56,10 @@ function App() {
   const maximumConcurrency =
     backend.capabilities?.concurrency.maximum ?? scheduler?.maxConcurrency ?? 1;
   const schedulerButtonLabel = !backendReady
-    ? "SYNC"
+    ? t("schedulerSync")
     : schedulerStopState
-      ? "STOP"
-      : "GO";
+      ? t("schedulerPause")
+      : t("schedulerStart");
 
   useEffect(() => {
     const listeners = [
@@ -71,7 +71,7 @@ function App() {
           if (event.payload) {
             void handleDroppedPaths(event.payload.paths).catch(
               (error: unknown) => {
-                toast.error("Unable to add dropped files", {
+                toast.error(i18n.t("addDroppedFilesFailed"), {
                   description: formatBackendError(error),
                 });
               },
@@ -132,8 +132,8 @@ function App() {
     } catch (error: unknown) {
       toast.error(
         delta > 0
-          ? "Unable to increase concurrency"
-          : "Unable to decrease concurrency",
+          ? i18n.t("increaseWorkersFailed")
+          : i18n.t("decreaseWorkersFailed"),
         { description: formatBackendError(error) },
       );
     }
@@ -147,7 +147,7 @@ function App() {
     try {
       await setSchedulerPaused(scheduler.mode === "running");
     } catch (error: unknown) {
-      toast.error("Unable to update the scheduler", {
+      toast.error(i18n.t("schedulerUpdateFailed"), {
         description: formatBackendError(error),
       });
     }
@@ -174,6 +174,8 @@ function App() {
                 <Button
                   size="icon"
                   onClick={openCreateTaskDialog}
+                  aria-label={t("createTask")}
+                  title={t("createTask")}
                   className="h-7 w-12 rounded-lg border text-muted-foreground"
                 >
                   <Plus size={16} className="text-white" />
@@ -207,6 +209,8 @@ function App() {
                   size="icon-sm"
                   className="size-7 rounded-lg border text-muted-foreground"
                   onClick={() => void adjustWorkerCount(1)}
+                  aria-label={t("increaseWorkers")}
+                  title={t("increaseWorkers")}
                   disabled={
                     !backendReady ||
                     backendCommands.workerCountPending ||
@@ -220,6 +224,8 @@ function App() {
                   size="icon-sm"
                   className="size-7 rounded-lg border bg-background text-muted-foreground hover:bg-muted-foreground/10"
                   onClick={() => void adjustWorkerCount(-1)}
+                  aria-label={t("decreaseWorkers")}
+                  title={t("decreaseWorkers")}
                   disabled={
                     !backendReady ||
                     backendCommands.workerCountPending ||
@@ -271,12 +277,15 @@ function App() {
 }
 
 function JobStatusMenu({ disabled }: { disabled: boolean }) {
+  const { t } = useTranslation();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           size="icon"
           disabled={disabled}
+          aria-label={t("jobStatusMenu")}
+          title={t("jobStatusMenu")}
           className="h-7 w-12 rounded-lg border bg-background text-muted-foreground hover:bg-muted-foreground/10"
         >
           <CookingPot size={16} />
@@ -287,16 +296,16 @@ function JobStatusMenu({ disabled }: { disabled: boolean }) {
           <figure className="flex items-center justify-center">
             <div className="h-2 w-2 rounded-full bg-green-400" />
           </figure>
-          <p className="mx-2">Success</p>
+          <p className="mx-2">{t("success")}</p>
         </DropdownMenuItem>
         <DropdownMenuItem>
           <figure className="flex items-center justify-center">
             <div className="h-2 w-2 rounded-full bg-red-400" />
           </figure>
-          <p className="mx-2">Error</p>
+          <p className="mx-2">{t("error")}</p>
         </DropdownMenuItem>
         <DropdownMenuItem disabled>
-          <p className="mx-4">ClearAll</p>
+          <p className="mx-4">{t("clearAll")}</p>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -304,6 +313,7 @@ function JobStatusMenu({ disabled }: { disabled: boolean }) {
 }
 
 function DragDropOverlay({ onDismiss }: { onDismiss: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="absolute inset-x-0 bottom-0 top-14 z-20 bg-black/10 p-4">
       <div className="relative flex h-full w-full flex-col items-center justify-center rounded-lg border-2 border-dashed bg-white p-4">
@@ -311,6 +321,7 @@ function DragDropOverlay({ onDismiss }: { onDismiss: () => void }) {
           variant="ghost"
           className="absolute right-2 top-2 px-2"
           onClick={onDismiss}
+          aria-label={t("close")}
         >
           <X size={24} className="text-muted-foreground" />
         </Button>
@@ -319,7 +330,7 @@ function DragDropOverlay({ onDismiss }: { onDismiss: () => void }) {
           size={36}
           strokeWidth={1.6}
         />
-        <p className="text-xl font-bold text-muted-foreground">Drop here </p>
+        <p className="text-xl font-bold text-muted-foreground">{t("dragAndDrop")}</p>
       </div>
     </div>
   );

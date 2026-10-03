@@ -3,5 +3,5 @@ export interface CreateTaskUiState {
   isOpen: boolean;
   isSubmitting: boolean;
   isDirty: boolean;
-  globalError: string | null;
+  globalError: unknown;
 }

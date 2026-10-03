@@ -16,13 +16,13 @@ import {
 } from "@/features/create-task";
 import type { ResizeFilter } from "@/lib/ipc/contracts";
 
-const RESIZE_FILTERS: readonly { value: ResizeFilter; label: string }[] = [
-  { value: "nearest", label: "Nearest" },
-  { value: "bilinear", label: "Bilinear" },
-  { value: "hamming", label: "Hamming" },
-  { value: "catmull_rom", label: "Catmull-Rom" },
-  { value: "mitchell", label: "Mitchell" },
-  { value: "lanczos3", label: "Lanczos3" },
+const RESIZE_FILTERS: readonly ResizeFilter[] = [
+  "nearest",
+  "bilinear",
+  "hamming",
+  "catmull_rom",
+  "mitchell",
+  "lanczos3",
 ];
 
 export function ResizeSettingsCard() {
@@ -79,8 +79,8 @@ export function ResizeSettingsCard() {
           </SelectTrigger>
           <SelectContent align="end" className="w-36 max-w-36">
             {RESIZE_FILTERS.map((filter) => (
-              <SelectItem key={filter.value} value={filter.value}>
-                {filter.label}
+              <SelectItem key={filter} value={filter}>
+                {t("resizeFilters." + filter)}
               </SelectItem>
             ))}
           </SelectContent>

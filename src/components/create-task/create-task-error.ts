@@ -1,3 +1,6 @@
+import type { TOptions } from "i18next";
+
+import { formatBackendError } from "@/features/backend";
 import { CreateTaskValidationError } from "@/features/create-task";
 
 const VALIDATION_ERROR_KEYS = {
@@ -26,31 +29,11 @@ const VALIDATION_ERROR_KEYS = {
 
 export function createTaskErrorMessage(
   error: unknown,
-  translate: (key: string) => string,
+  translate: (key: string, options?: TOptions) => string,
 ): string {
   if (error instanceof CreateTaskValidationError) {
     return translate(VALIDATION_ERROR_KEYS[error.code]);
   }
 
-  if (isRecord(error)) {
-    const appError = isRecord(error.error) ? error.error : error;
-    if (typeof appError.fallbackMessage === "string") {
-      return appError.fallbackMessage;
-    }
-    if (typeof appError.message === "string") {
-      return appError.message;
-    }
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  return translate("createTaskErrorUnknown");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return formatBackendError(error, translate, "createTaskErrorUnknown");
 }

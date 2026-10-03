@@ -2,12 +2,15 @@
 
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const { t } = useTranslation()
   return (
     <Sonner
       theme="system"
       className="toaster group"
+      containerAriaLabel={t("notifications")}
       icons={{
         success: (
           <CircleCheckIcon className="size-4" />
@@ -34,6 +37,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         } as React.CSSProperties
       }
       toastOptions={{
+        closeButtonAriaLabel: t("close"),
         classNames: {
           toast: "cn-toast",
         },
