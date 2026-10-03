@@ -10,7 +10,7 @@ let environment = process.env;
 if (process.platform === "win32" && ["dev", "build"].includes(argumentsList[0])) {
   const setup = spawnSync("powershell.exe", [
     "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-    join(project, "tools/build-windows.ps1"), "-DependenciesOnly",
+    join(project, "tools/build-windows.ps1"),
   ], { cwd: project, stdio: "inherit" });
   if (setup.error) throw setup.error;
   if (setup.status !== 0) process.exit(setup.status ?? 1);

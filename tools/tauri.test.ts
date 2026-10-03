@@ -22,7 +22,7 @@ it.each(["dev", "build"])("prepares Windows native dependencies for %s without c
 
   expect(launch).toHaveBeenCalledTimes(2);
   expect(launch.mock.calls[0][0]).toBe("powershell.exe");
-  expect(launch.mock.calls[0][1]).toContain("-DependenciesOnly");
+  expect(launch.mock.calls[0][1].at(-1)).toMatch(/tools[\\/]build-windows\.ps1$/);
   const [executable, forwardedArguments, options] = launch.mock.calls[1];
   expect(executable).toBe(process.execPath);
   expect(forwardedArguments.slice(1)).toEqual(argumentsList);

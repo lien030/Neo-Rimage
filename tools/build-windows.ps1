@@ -1,7 +1,3 @@
-param(
-    [switch]$DependenciesOnly,
-    [string[]]$CargoArguments = @('test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml', '--lib')
-)
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
 $native = Join-Path $project 'src-tauri/target/native'
@@ -27,10 +23,3 @@ $env:PKG_CONFIG = Join-Path $vcpkg 'installed/x64-windows/tools/pkgconf/pkgconf.
 $env:PKG_CONFIG_PATH = Join-Path $vcpkg 'installed/x64-windows-static-md/lib/pkgconfig'
 $env:SYSTEM_DEPS_DAV1D_LINK = 'static'
 $env:SYSTEM_DEPS_DAV1D_BUILD_INTERNAL = 'never'
-if (!$DependenciesOnly) {
-    Push-Location $project
-    try {
-        & cargo @CargoArguments
-        if ($LASTEXITCODE) { throw 'Cargo command failed' }
-    } finally { Pop-Location }
-}

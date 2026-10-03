@@ -9,7 +9,7 @@ use crate::domain::{
     EngineOutcome, EngineProgressEvent, EngineRequest, EngineResult, EngineWarning, ErrorCategory,
     ImageFormat, MetadataOutcome, Operation, ProcessingStage, ProgressMeasure, ProgressReporter,
 };
-use std::{collections::BTreeMap, fs, path::Path, time::Instant};
+use std::{collections::BTreeMap, path::Path, time::Instant};
 
 pub trait Engine: Send + Sync {
     fn prepare(
@@ -95,7 +95,7 @@ impl LocalEngine {
             ProcessingStage::Inspect,
             || {
                 check_cancel(request, ProcessingStage::Inspect, context.cancellation)?;
-                inspect_input(request)
+                Ok(plan.input_bytes)
             },
         )?;
 
@@ -334,34 +334,6 @@ impl Engine for LocalEngine {
     ) -> EngineOutcome {
         self.execute_inner(request, plan, context)
     }
-}
-
-fn inspect_input(request: &EngineRequest) -> Result<u64, AppError> {
-    let metadata = fs::metadata(&request.input_path).map_err(|_| {
-        engine_error(
-            request,
-            ProcessingStage::Inspect,
-            ErrorCategory::Input,
-            "input.metadata_unavailable",
-            "errors.inputUnavailable",
-            "The input file could not be inspected.",
-            false,
-            &request.input_path,
-        )
-    })?;
-    if !metadata.is_file() {
-        return Err(engine_error(
-            request,
-            ProcessingStage::Inspect,
-            ErrorCategory::Input,
-            "input.not_regular_file",
-            "errors.inputNotRegularFile",
-            "The input path is not a regular file.",
-            false,
-            &request.input_path,
-        ));
-    }
-    Ok(metadata.len())
 }
 
 fn encode_to_transaction(
@@ -706,6 +678,7 @@ mod tests {
         engine::{AtomicCancellationToken, NeverCancelled, NoopProgressReporter},
     };
     use std::{
+        fs,
         path::PathBuf,
         sync::Mutex,
         time::{SystemTime, UNIX_EPOCH},
@@ -1101,13 +1074,14 @@ mod tests {
                 assert!(pixels[0].iter().all(|value| matches!(value, 0 | 255)));
                 assert_ne!(pixels[0][0], pixels[0][1]);
             }
-            LocalEngine::new()
+            let result = LocalEngine::new()
                 .execute_prepared(
                     &request,
                     &plan,
                     &EngineContext::new(&NoopProgressReporter, &NeverCancelled),
                 )
                 .unwrap_or_else(|error| panic!("compression {compression}: {error:?}"));
+            assert_eq!(result.input_bytes, plan.input_bytes);
         }
     }
 

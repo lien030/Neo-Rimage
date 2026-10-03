@@ -129,9 +129,7 @@ where
     R: Read + Seek,
 {
     fn decode(&mut self) -> Result<Image, ImageErrors> {
-        let (width, height) = self.inner.dimensions().map_err(|e| {
-            ImageErrors::ImageDecodeErrors(format!("Unable to read dimensions - {e}"))
-        })?;
+        let ((width, height), colorspace, bits, _) = self.probe()?;
 
         let (width, height) = (width as usize, height as usize);
 
@@ -149,27 +147,7 @@ where
 
         self.dimensions = Some((width, height));
 
-        let colortype = self.inner.colortype().map_err(|e| {
-            ImageErrors::ImageDecodeErrors(format!("Unable to read colorspace - {e}"))
-        })?;
-        let colorspace = match colortype {
-            tiff::ColorType::RGB(_) => ColorSpace::RGB,
-            tiff::ColorType::RGBA(_) => ColorSpace::RGBA,
-            tiff::ColorType::CMYK(_) => ColorSpace::CMYK,
-            tiff::ColorType::Gray(_) => ColorSpace::Luma,
-            tiff::ColorType::GrayA(_) => ColorSpace::LumaA,
-            tiff::ColorType::YCbCr(_) => ColorSpace::YCbCr,
-            other => {
-                return Err(ImageErrors::ImageDecodeErrors(format!(
-                    "Unsupported TIFF color type: {other:?}"
-                )));
-            }
-        };
-
         self.colorspace = colorspace;
-        if let tiff::ColorType::YCbCr(bits) = colortype {
-            self.validate_ycbcr(bits)?;
-        }
 
         let result = self.inner.read_image().map_err(|e| {
             ImageErrors::ImageDecodeErrors(format!("Unable to decode TIFF file - {e}"))
@@ -177,7 +155,7 @@ where
 
         match result {
             tiff::decoder::DecodingResult::U8(data) => {
-                if let tiff::ColorType::Gray(bits @ (1 | 2 | 4)) = colortype {
+                if colorspace == ColorSpace::Luma && matches!(bits, 1 | 2 | 4) {
                     let stride = (width * bits as usize).div_ceil(8);
                     if data.len() != stride * height {
                         return Err(ImageErrors::ImageDecodeErrors(

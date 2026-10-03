@@ -482,11 +482,7 @@ pub fn decode(request: &EngineRequest, plan: &PreparedInput) -> Result<Image, Pr
         InputKind::Svg => unreachable!(),
     }
     .map_err(invalid)?;
-    let expected = if plan.kind == InputKind::Svg {
-        plan.render_size
-    } else {
-        (plan.properties.width, plan.properties.height)
-    };
+    let expected = (plan.properties.width, plan.properties.height);
     if image.dimensions() != (expected.0 as usize, expected.1 as usize) || image.frames_len() != 1 {
         return Err(error(
             "input.changed",

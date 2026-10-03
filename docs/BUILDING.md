@@ -16,7 +16,7 @@ From the project root:
 
 ```powershell
 pnpm install --frozen-lockfile
-. ./tools/build-windows.ps1 -DependenciesOnly
+. ./tools/build-windows.ps1
 cargo fetch --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
 node tools/prepare-release.mjs
 pnpm test
