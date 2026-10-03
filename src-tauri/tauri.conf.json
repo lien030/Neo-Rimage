@@ -30,6 +30,16 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "license": "GPL-3.0-or-later",
+    "resources": {
+      "../licenses/PROJECT-MIT.txt": "licenses/PROJECT-MIT.txt",
+      "../docs/DISTRIBUTION.md": "licenses/DISTRIBUTION.md",
+      "../docs/BUILDING.md": "licenses/BUILDING.md",
+      "../docs/SOURCES.md": "licenses/SOURCES.md",
+      "../licenses/GPL-3.0.txt": "licenses/GPL-3.0.txt",
+      "../licenses/INSTALLER-NOTICES.txt": "licenses/INSTALLER-NOTICES.txt",
+      "../licenses/THIRD-PARTY-NOTICES.txt": "licenses/THIRD-PARTY-NOTICES.txt"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

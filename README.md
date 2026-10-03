@@ -107,7 +107,7 @@ To build only an NSIS installer on Windows:
 pnpm tauri build --bundles nsis
 ```
 
-Release bundles are written to `src-tauri/target/release/bundle/` by default. For a debug NSIS package, use `pnpm tauri build --debug --bundles nsis`. Current native packaging validation covers the Windows x64 debug application and NSIS package, not release packaging or installation/uninstallation.
+Windows x64 EXE/MSI installers and a portable ZIP are available from [Releases](https://github.com/lien030/Neo-Rimage/releases). Release bundles are written to `src-tauri/target/release/bundle/` by default. Release application, NSIS, and MSI builds are validated; installation/uninstallation has not been tested. See [release build instructions](docs/BUILDING.md), including license resource preparation before publishing.
 
 ### Checks
 
@@ -169,6 +169,6 @@ README organization and presentation also take cues from [Caesium Image Compress
 
 ## License
 
-neo-rimage is licensed under the **MIT License**. See [LICENSE](LICENSE) for the full text.
+Original neo-rimage source is licensed under the **MIT License**. See [LICENSE](LICENSE) for the full text. The combined application binaries include GPL-licensed imagequant and are distributed under **GPL-3.0-or-later**; see the [distribution terms](docs/DISTRIBUTION.md), [fixed-version source references](docs/SOURCES.md), and [release build instructions](docs/BUILDING.md). Installers and portable packages include the accompanying license materials.
 
 The vendored rimage library is licensed under **MIT OR Apache-2.0**; see its [MIT license](src-tauri/vendor/rimage/LICENSE-MIT) and [Apache-2.0 license](src-tauri/vendor/rimage/LICENSE-APACHE). Other dependencies retain their respective licenses.

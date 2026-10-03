@@ -107,7 +107,7 @@ Windows で NSIS インストーラーのみをビルドする場合：
 pnpm tauri build --bundles nsis
 ```
 
-リリース用のインストーラーは、既定で `src-tauri/target/release/bundle/` に出力されます。デバッグ用 NSIS パッケージには `pnpm tauri build --debug --bundles nsis` を使用してください。現在のネイティブパッケージングの検証対象は Windows x64 のデバッグアプリと NSIS パッケージであり、リリース用パッケージングやインストール・アンインストールの手順はまだ検証していません。
+Windows x64 用の EXE/MSI インストーラーとポータブル ZIP は [Releases](https://github.com/lien030/Neo-Rimage/releases) からダウンロードできます。リリース用のインストーラーは、既定で `src-tauri/target/release/bundle/` に出力されます。リリースアプリ、NSIS、MSI のビルドは検証済みですが、インストール・アンインストールの手順は未検証です。公開前のライセンス資料の準備については[リリースビルド手順](docs/BUILDING.md)を参照してください。
 
 ### チェックとテスト
 
@@ -169,6 +169,6 @@ README の構成と見せ方は、[Caesium Image Compressor](https://github.com/
 
 ## ライセンス
 
-neo-rimage は **MIT ライセンス**で提供されています。全文は [LICENSE](LICENSE) を参照してください。
+neo-rimage のオリジナルソースは **MIT ライセンス**で提供されています。全文は [LICENSE](LICENSE) を参照してください。結合されたアプリケーションのバイナリには GPL ライセンスの imagequant が含まれるため、**GPL-3.0-or-later** で配布します。[配布条件](docs/DISTRIBUTION.md)、[固定バージョンのソース一覧](docs/SOURCES.md)、[リリースビルド手順](docs/BUILDING.md)を参照してください。インストーラーとポータブル版にはライセンス資料が同梱されます。
 
 同梱 rimage ライブラリは **MIT OR Apache-2.0** でライセンスされています。[MIT ライセンス](src-tauri/vendor/rimage/LICENSE-MIT)と [Apache-2.0 ライセンス](src-tauri/vendor/rimage/LICENSE-APACHE)を参照してください。その他の依存関係には、それぞれのライセンスが適用されます。

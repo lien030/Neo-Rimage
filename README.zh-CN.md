@@ -107,7 +107,7 @@ Windows 下若只需要 NSIS 安装包：
 pnpm tauri build --bundles nsis
 ```
 
-Release 安装包默认输出到 `src-tauri/target/release/bundle/`。需要 debug NSIS 安装包时，使用 `pnpm tauri build --debug --bundles nsis`。目前原生打包验证覆盖 Windows x64 debug 应用与 NSIS 安装包，尚未覆盖 release 打包及安装、卸载流程。
+Windows x64 的 EXE/MSI 安装器及便携 ZIP 可从 [Releases](https://github.com/lien030/Neo-Rimage/releases) 下载。Release 安装包默认输出到 `src-tauri/target/release/bundle/`。已验证 Release 应用、NSIS 与 MSI 构建，尚未验证安装、卸载流程。发布前的许可资源准备见[发行版构建说明](docs/BUILDING.md)。
 
 ### 检查与测试
 
@@ -169,6 +169,6 @@ README 的组织与展示方式也参考了 [Caesium Image Compressor](https://g
 
 ## 许可证
 
-neo-rimage 采用 **MIT 许可证**，完整条款见 [LICENSE](LICENSE)。
+neo-rimage 原创源码采用 **MIT 许可证**，完整条款见 [LICENSE](LICENSE)。组合应用二进制包含采用 GPL 许可的 imagequant，按 **GPL-3.0-or-later** 分发；详见[发行许可](docs/DISTRIBUTION.md)、[固定版本源码清单](docs/SOURCES.md)和[发行版构建说明](docs/BUILDING.md)。安装器与便携包附带相应许可资料。
 
 内置 rimage 库采用 **MIT OR Apache-2.0** 双许可证，详见其 [MIT 许可证](src-tauri/vendor/rimage/LICENSE-MIT)与 [Apache-2.0 许可证](src-tauri/vendor/rimage/LICENSE-APACHE)。其他依赖保留各自的许可证。
