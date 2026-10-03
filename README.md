@@ -93,25 +93,22 @@ Clone or download this repository, open a terminal in its root directory, and ru
 
 ```powershell
 pnpm install --frozen-lockfile
-. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri dev
 ```
 
-`pnpm tauri dev` starts both Vite and the native application. `pnpm dev` starts only the frontend development server; it does not provide the native backend required for image processing.
+`pnpm tauri dev` starts both Vite and the native application. On Windows, `pnpm tauri dev` and `pnpm tauri build` automatically prepare the pinned native dependencies and pass their environment to Tauri; cached dependencies are reused without changing global PATH. `pnpm dev` starts only the frontend development server; it does not provide the native backend required for image processing.
 
 ### Build
 
 Build the desktop application and the platform's configured installer bundles:
 
 ```powershell
-. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build
 ```
 
 To build only an NSIS installer on Windows:
 
 ```powershell
-. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build --bundles nsis
 ```
 

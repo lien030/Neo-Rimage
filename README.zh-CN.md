@@ -96,25 +96,22 @@ Windows 下请使用 **MSVC Rust 工具链**，安装 Microsoft C++ Build Tools�
 
 ```powershell
 pnpm install --frozen-lockfile
-. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri dev
 ```
 
-`pnpm tauri dev` 会同时启动 Vite 与原生应用。`pnpm dev` 只启动前端开发服务器，不会提供图片处理所需的原生后端。
+`pnpm tauri dev` 会同时启动 Vite 与原生应用。Windows 下，`pnpm tauri dev` 和 `pnpm tauri build` 会自动准备固定版本的原生依赖，并将所需环境传给 Tauri；复用已缓存的依赖，不修改全局 PATH。`pnpm dev` 只启动前端开发服务器，不会提供图片处理所需的原生后端。
 
 ### 构建应用
 
 构建桌面应用及当前平台配置的安装包：
 
 ```powershell
-. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build
 ```
 
 Windows 下若只需要 NSIS 安装包：
 
 ```powershell
-. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build --bundles nsis
 ```
 

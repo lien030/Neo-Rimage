@@ -8,7 +8,7 @@ Validated tools: Node.js **24.19.0**, pnpm **10.30.3**, Rust/Cargo **1.96.1**, M
 
 ### Native dependency
 
-`tools/build-windows.ps1` pins vcpkg baseline **2c60af75f9d1ea85143242f92864ffa0dd2f78e7** and builds **dav1d 1.5.4** using `x64-windows-static-md`: static dav1d with dynamic MSVC CRT. pkgconf locates its library for dav1d-sys. The script changes only the current process environment; downloads, builds and binary caches stay under `src-tauri/target/native/`. Dot-source it in the same PowerShell session used for Cargo/Tauri. It does not modify global PATH or install a newer toolchain.
+`tools/build-windows.ps1` pins vcpkg baseline **2c60af75f9d1ea85143242f92864ffa0dd2f78e7** and builds **dav1d 1.5.4** using `x64-windows-static-md`: static dav1d with dynamic MSVC CRT. pkgconf locates its library for dav1d-sys. The script changes only the current process environment; downloads, builds and binary caches stay under `src-tauri/target/native/`. On Windows, `pnpm tauri dev` and `pnpm tauri build` automatically run this preparation and pass the environment to Tauri. For direct Cargo commands and contract generation, dot-source the script in the same PowerShell session first. It does not modify global PATH or install a newer toolchain.
 
 rimage uses an explicit feature whitelist with AVIF/TIFF/SVG/limits. Its CLI and overall threads feature remain disabled; ravif default features are disabled too. dav1d decoding uses one internal thread. This does not claim every third-party codec has no internal threads.
 
@@ -48,7 +48,7 @@ See [v0.1.1-validation.md](v0.1.1-validation.md) for tests and measured parallel
 
 ### 原生依赖与构建
 
-`tools/build-windows.ps1` 固定上述 vcpkg baseline，构建 **dav1d 1.5.4 静态库、动态 MSVC CRT**。下载、构建及缓存均放在 `src-tauri/target/native/`，仅设置当前进程环境，不修改全局 PATH、不升级工具链。请在执行 Cargo/Tauri 的同一个 PowerShell 会话中点源运行脚本，再按上方命令验证、构建和打包。
+`tools/build-windows.ps1` 固定上述 vcpkg baseline，构建 **dav1d 1.5.4 静态库、动态 MSVC CRT**。下载、构建及缓存均放在 `src-tauri/target/native/`，仅设置当前进程环境，不修改全局 PATH、不升级工具链。Windows 下 `pnpm tauri dev` 和 `pnpm tauri build` 会自动准备依赖并向 Tauri 传递环境；直接执行 Cargo 或生成契约时，仍需在同一个 PowerShell 会话中先点源运行脚本，再按上方命令验证和打包。
 
 保留 rimage 显式 feature 白名单，增加 AVIF/TIFF/SVG/limits，不启用 CLI 或整体线程特性；ravif 默认 feature 关闭，dav1d 内部解码线程固定为 1。这不表示所有第三方编码器都没有内部线程。
 

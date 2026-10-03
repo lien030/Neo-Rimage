@@ -96,25 +96,22 @@ Windows では **MSVC 版の Rust ツールチェーン**を使用してくだ�
 
 ```powershell
 pnpm install --frozen-lockfile
-. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri dev
 ```
 
-`pnpm tauri dev` は Vite とネイティブアプリの両方を起動します。`pnpm dev` はフロントエンドの開発サーバーのみを起動し、画像処理に必要なネイティブバックエンドは提供しません。
+`pnpm tauri dev` は Vite とネイティブアプリの両方を起動します。Windows では `pnpm tauri dev` と `pnpm tauri build` が固定バージョンのネイティブ依存関係を自動準備し、必要な環境を Tauri に渡します。キャッシュ済みの依存関係を再利用し、グローバル PATH は変更しません。`pnpm dev` はフロントエンドの開発サーバーのみを起動し、画像処理に必要なネイティブバックエンドは提供しません。
 
 ### アプリのビルド
 
 デスクトップアプリと、現在のプラットフォームで設定されているインストーラーをビルドします。
 
 ```powershell
-. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build
 ```
 
 Windows で NSIS インストーラーのみをビルドする場合：
 
 ```powershell
-. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build --bundles nsis
 ```
 

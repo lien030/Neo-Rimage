@@ -17,7 +17,7 @@
     "test:watch": "vitest",
     "contracts:generate": "node tools/generate-contracts.mjs",
     "contracts:check": "node tools/generate-contracts.mjs --check",
-    "tauri": "tauri"
+    "tauri": "node tools/tauri.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
