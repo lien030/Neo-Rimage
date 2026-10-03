@@ -1,4 +1,4 @@
-export const IPC_SCHEMA_VERSION = 1 as const;
+export const IPC_SCHEMA_VERSION = 2 as const;
 export const JOB_CONFIG_VERSION = 1 as const;
 export const DEFAULT_ITEM_PAGE_SIZE = 200 as const;
 export const MAX_ITEM_PAGE_SIZE = 1000 as const;
@@ -75,7 +75,7 @@ export type ItemProgress = { stage: ProcessingStage, measure: ProgressMeasure, }
 
 export type ItemResultSummary = { outputPath: string, inputBytes: number, outputBytes: number, durationMs: number, };
 
-export type ItemSnapshot = { id: ItemId, jobId: JobId, revision: Revision, sequence: number, attempt: number, inputPath: string, outputPath: string | null, status: ItemStatus, stage: ProcessingStage | null, progress: ItemProgress | null, workerSlotId: WorkerSlotId | null, createdAt: TimestampMs, startedAt: TimestampMs | null, finishedAt: TimestampMs | null, controls: ItemControlAvailability, result: ItemResultSummary | null, error: AppError | null, warnings: Array<EngineWarning>, };
+export type ItemSnapshot = { id: ItemId, jobId: JobId, revision: Revision, sequence: number, attempt: number, inputPath: string, outputPath: string | null, status: ItemStatus, queueReason: QueueReason | null, stage: ProcessingStage | null, progress: ItemProgress | null, workerSlotId: WorkerSlotId | null, createdAt: TimestampMs, startedAt: TimestampMs | null, finishedAt: TimestampMs | null, controls: ItemControlAvailability, result: ItemResultSummary | null, error: AppError | null, warnings: Array<EngineWarning>, };
 
 export type ItemStatus = "queued" | "running" | "cancelling" | "succeeded" | "failed" | "cancelled" | "skipped";
 
@@ -83,7 +83,7 @@ export type JobCommand = { schemaVersion: number, correlationId: CorrelationId, 
 
 export type JobControlAvailability = { canPause: boolean, canResume: boolean, canCancel: boolean, canRetry: boolean, canRemove: boolean, };
 
-export type JobCounts = { total: number, queued: number, running: number, cancelling: number, succeeded: number, failed: number, cancelled: number, skipped: number, };
+export type JobCounts = { total: number, queued: number, waitingForMemory: number, running: number, cancelling: number, succeeded: number, failed: number, cancelled: number, skipped: number, };
 
 export type JobDetailSnapshot = { schemaVersion: number, revision: Revision, job: JobSnapshot, items: Page<ItemSnapshot>, };
 
@@ -138,6 +138,8 @@ export type ProcessingStage = "preflight" | "inspect" | "decode" | "normalize" |
 export type ProgressMeasure = { "kind": "indeterminate" } | { "kind": "fraction", completed: number, total: number, };
 
 export type QuantizeOperation = { quality: number, };
+
+export type QueueReason = "preparing" | "memory" | "concurrency";
 
 export type RejectedInput = { inputIndex: number, path: string, error: AppError, };
 

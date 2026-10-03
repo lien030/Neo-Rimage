@@ -2,41 +2,62 @@
 
 ## English
 
-Release **0.1.0** targets Windows x64 (`x86_64-pc-windows-msvc`). Use the source at tag `v0.1.0`, including the vendored rimage source and both lockfiles. The release preparation only adds packaging/license documentation; image processing features and the UI are unchanged.
+Release **0.1.1** targets Windows x64 (`x86_64-pc-windows-msvc`). Use the source revision matching the binary, including vendored rimage and both lockfiles. This version does not upgrade the compiler, framework or installer toolchain.
 
-Installer tools: NSIS **3.11**, WiX **3.14.1**, nsis-tauri-utils **0.5.3**. Their unchanged source links and notices are in `licenses/INSTALLER-NOTICES.txt`; review this file when upgrading the installer tooling.
+Validated tools: Node.js **24.19.0**, pnpm **10.30.3**, Rust/Cargo **1.96.1**, MSVC C++ Build Tools with Windows SDK, NASM, and Windows VBScript for MSI generation. See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/). Installer tools remain NSIS **3.11**, WiX **3.14.1**, nsis-tauri-utils **0.5.3**; sources/notices are in `licenses/INSTALLER-NOTICES.txt`. WebView2 is required at runtime, but no separate rimage, dav1d or vcpkg installation is needed.
 
-Validated tools: Node.js **24.19.0**, pnpm **10.30.3**, Rust/Cargo **1.96.1**, MSVC C++ Build Tools with a Windows SDK, NASM, and the Windows VBScript feature for MSI generation. See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/). WebView2 Runtime is required to run the app, not a separate rimage executable. Toolchain executables are general-purpose build tools and are not included as corresponding source.
+### Native dependency
+
+`tools/build-windows.ps1` pins vcpkg baseline **2c60af75f9d1ea85143242f92864ffa0dd2f78e7** and builds **dav1d 1.5.4** using `x64-windows-static-md`: static dav1d with dynamic MSVC CRT. pkgconf locates its library for dav1d-sys. The script changes only the current process environment; downloads, builds and binary caches stay under `src-tauri/target/native/`. Dot-source it in the same PowerShell session used for Cargo/Tauri. It does not modify global PATH or install a newer toolchain.
+
+rimage uses an explicit feature whitelist with AVIF/TIFF/SVG/limits. Its CLI and overall threads feature remain disabled; ravif default features are disabled too. dav1d decoding uses one internal thread. This does not claim every third-party codec has no internal threads.
 
 From the project root:
 
 ```powershell
 pnpm install --frozen-lockfile
+. ./tools/build-windows.ps1 -DependenciesOnly
 cargo fetch --locked --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
 node tools/prepare-release.mjs
 pnpm test
 pnpm contracts:check
 cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
 cargo test --locked --manifest-path src-tauri/Cargo.toml -p rimage --lib
+cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 pnpm tauri build --bundles nsis,msi --ci -- --locked
+./tools/package-windows.ps1
 ```
 
-Cargo and pnpm fetch the exact registry packages specified by the lockfiles. Their published source archives and original upstream source commits are linked in [SOURCES.md](SOURCES.md). Upstream frontend source archives may be monorepos: the npm package's repository metadata identifies the component directory. Use the published npm package archive as the locked build input and the linked upstream source for modifications. Rust crate archives include their build scripts and bundled native sources. Preserve notices if rebuilding or modifying components.
+The build hook runs `pnpm build`. Packaging writes the NSIS installer, MSI, portable ZIP and SHA256SUMS to `src-tauri/target/distribution/0.1.1/`. The ZIP includes the EXE and the same license materials as installers; copying only the EXE omits them. Artifacts are unsigned. These scripts do not push, tag or publish a Release.
 
-The configured build hook runs `pnpm build`. Run `node tools/prepare-release.mjs` before preparing a new release: it inventories the target's normal/build Rust dependency graph and frontend packages processed by Vite, refreshes `docs/SOURCES.md`, and generates license resources in `licenses/`. These resources are committed so ordinary development and tests do not need network license lookups. The preparation script retrieves public npm source metadata and fails if an exact source commit or a license file needs review. Internet access is needed for registry sources/metadata and Tauri's installer tooling on the first build. This is not an offline-build claim.
+### Source and licensing
 
-The EXE is written to `src-tauri/target/release/neo-rimage.exe`; installers are under `src-tauri/target/release/bundle/`. For a portable archive, include the EXE and the same `licenses` directory as the installers; copying only the EXE omits its accompanying license materials. For a future version, update the application version consistently and regenerate/review source references before tagging. Byte-identical reproducibility is not claimed.
+Cargo/pnpm fetch exact packages from their lockfiles. `tools/prepare-release.mjs` inventories normal/build Rust dependencies, frontend packages processed by Vite, and **native dav1d outside the Cargo graph**. It verifies the native source SHA-512/version, adds BSD/ISC notices, and refreshes `docs/SOURCES.md` and `licenses/THIRD-PARTY-NOTICES.txt`. Run and review it for each release. Committed notices allow ordinary development without license lookups.
+
+Published dependency archives, upstream revisions, native archive/checksum and fixed vcpkg recipe are linked in [SOURCES.md](SOURCES.md). npm repositories may be monorepos; package repository metadata identifies components. Rust archives include build scripts and bundled sources. Preserve notices when rebuilding/modifying. Registry access and first-time native/installer downloads require Internet; offline or byte-identical reproducibility is not claimed. General-purpose compiler executables are not corresponding source.
+
+Original project source remains MIT. Combined binaries including imagequant are distributed under GPL-3.0-or-later; see [DISTRIBUTION.md](DISTRIBUTION.md). Native dav1d retains its own BSD/ISC notices.
+
+### Validation boundary
+
+See [v0.1.1-validation.md](v0.1.1-validation.md) for tests and measured parallel throughput. PE import inspection and running without native build environment variables check the static link on the development host. They are **not** substitutes for startup, conversion and install/uninstall tests on clean Windows without dav1d/vcpkg. Such a VM was unavailable during implementation; verify it before publication. macOS/Linux builds are not validated.
 
 ## 简体中文
 
-**0.1.0** 发行版面向 Windows x64（`x86_64-pc-windows-msvc`）。使用 `v0.1.0` 标签中的源码，保留内置 rimage 源码及两个锁文件。本次发行准备只增加打包和许可资料，不改变图像处理功能或 UI。
+**0.1.1** 面向 Windows x64。使用与二进制对应的源码提交、内置 rimage 和两个锁文件；本版本不升级编译器、框架或安装器工具链。工具版本及系统前提见上方；运行需要 WebView2，不需要独立 rimage、dav1d 或 vcpkg。
 
-安装器工具版本：NSIS **3.11**、WiX **3.14.1**、nsis-tauri-utils **0.5.3**。未修改的上游源码链接及许可见 `licenses/INSTALLER-NOTICES.txt`，升级安装器工具后须审核该文件。
+### 原生依赖与构建
 
-已验证工具：Node.js **24.19.0**、pnpm **10.30.3**、Rust/Cargo **1.96.1**、包含 Windows SDK 的 MSVC C++ Build Tools、NASM，以及生成 MSI 所需的 Windows VBScript 功能。系统前提见上方 Tauri 链接。运行应用需要 WebView2 Runtime，不需要额外的 rimage 可执行程序。通用构建工具的可执行文件不列入对应源码。
+`tools/build-windows.ps1` 固定上述 vcpkg baseline，构建 **dav1d 1.5.4 静态库、动态 MSVC CRT**。下载、构建及缓存均放在 `src-tauri/target/native/`，仅设置当前进程环境，不修改全局 PATH、不升级工具链。请在执行 Cargo/Tauri 的同一个 PowerShell 会话中点源运行脚本，再按上方命令验证、构建和打包。
 
-在项目根目录执行上面的命令。Cargo 和 pnpm 根据锁文件下载精确版本的注册表包；[SOURCES.md](SOURCES.md) 链接了这些源码归档及前端包的上游源码提交。前端上游可能为 monorepo，包的 repository 元数据标明组件目录。已发布的 npm 归档是锁定的构建输入，上游源码用于修改；Rust crate 归档包含构建脚本及内置原生源码。重新构建或修改时请保留许可声明。
+保留 rimage 显式 feature 白名单，增加 AVIF/TIFF/SVG/limits，不启用 CLI 或整体线程特性；ravif 默认 feature 关闭，dav1d 内部解码线程固定为 1。这不表示所有第三方编码器都没有内部线程。
 
-构建钩子运行 `pnpm build`。准备新版本发行前执行 `node tools/prepare-release.mjs`，盘点目标平台的普通/构建 Rust 依赖及 Vite 处理过的前端包，刷新 `docs/SOURCES.md`，并在 `licenses/` 生成许可资源。这些资料提交到仓库，日常开发和测试无需联网查询许可。脚本遇到缺少精确源码提交或许可证文件时会要求检查，并读取公开 npm 元数据。首次下载依赖和安装器工具也需要联网，不宣称离线构建。
+安装器、MSI、包含许可资料的便携 ZIP 与 SHA256SUMS 输出到 `src-tauri/target/distribution/0.1.1/`。安装包未签名。脚本不会 push、打 tag 或发布 GitHub Release。
 
-主程序和安装包分别输出到上方列出的目录。制作便携包时，将 EXE 与安装器中相同的 `licenses` 文件夹一起打包，不能仅复制 EXE 而遗漏许可资料。后续版本须统一更新版本号，并在打标签前重新生成和审核源码清单。不保证逐字节一致的可复现构建。
+### 源码、许可与验证
+
+每次发行前运行并审核 `tools/prepare-release.mjs`。它根据锁文件盘点 Rust/前端依赖，并额外盘点 **Cargo 图之外的静态 dav1d**，核对源码 SHA-512 及版本，生成 BSD/ISC 声明、源码清单和第三方许可资料。精确源码、校验值及固定 vcpkg 配方见 [SOURCES.md](SOURCES.md)。保留许可；不宣称离线或逐字节一致的构建。通用编译工具的可执行文件不属于对应源码。
+
+原创源码保持 MIT；包含 imagequant 的组合二进制按 GPL-3.0-or-later 分发，详见 [DISTRIBUTION.md](DISTRIBUTION.md)。便携包必须附带与安装器相同的许可资料，不能只复制 EXE。
+
+测试及混合批处理实测见 [v0.1.1-validation.md](v0.1.1-validation.md)。开发机 PE 导入检查、移除原生构建环境后的启动，不能替代干净 Windows 启动、转换、安装/卸载验证；本次无可用干净虚拟机，请在发布前补验。macOS/Linux 未验证。

@@ -10,7 +10,7 @@ use rimage::{
     codecs::{
         mozjpeg::{MozJpegEncoder, MozJpegOptions},
         oxipng::{OxiPngEncoder, OxiPngOptions},
-        webp::{WebPDecoder, WebPEncoder, WebPOptions},
+        webp::{WebPEncoder, WebPOptions},
     },
     operations::{
         icc::ApplySRGB,
@@ -18,16 +18,16 @@ use rimage::{
         resize::{FilterType, Resize, ResizeAlg},
     },
 };
-use std::{fs::File, io, io::Write, path::Path};
+use std::{io, io::Write, path::Path};
 use zune_core::{bit_depth::BitDepth, colorspace::ColorSpace};
 use zune_image::{
     codecs::{
         farbfeld::FarbFeldEncoder, jpeg_xl::JxlEncoder, png::PngEncoder, ppm::PPMEncoder,
-        qoi::QoiEncoder, ImageFormat as ZuneImageFormat,
+        qoi::QoiEncoder,
     },
     errors::{ImageErrors, ImgEncodeErrors},
     image::Image,
-    traits::{DecoderTrait, EncoderTrait, OperationsTrait},
+    traits::{EncoderTrait, OperationsTrait},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -42,17 +42,6 @@ pub(crate) enum ResizeEffect {
 pub(crate) struct NormalizeOutcome {
     pub had_color_profile: bool,
     pub converted_to_srgb: bool,
-}
-
-pub(crate) fn decode(path: &Path) -> Result<Image, ImageErrors> {
-    let extension = path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .map(str::to_ascii_lowercase);
-    match extension.as_deref() {
-        Some("webp") => WebPDecoder::try_new(File::open(path)?)?.decode(),
-        _ => Image::open(path),
-    }
 }
 
 pub(crate) fn normalize_color_profile(
@@ -355,21 +344,6 @@ impl<W: Write> Write for CountingWriter<W> {
     }
 }
 
-pub(crate) fn image_properties(image: &Image, path: &Path) -> Result<ImageProperties, io::Error> {
-    let (width, height) = image.dimensions();
-    Ok(ImageProperties {
-        format: detected_format(image, path),
-        width: u32::try_from(width)
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "image width exceeds u32"))?,
-        height: u32::try_from(height)
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "image height exceeds u32"))?,
-        bit_depth: bit_depth(image.depth()),
-        color_space: Some(color_space_name(image.colorspace()).to_owned()),
-        has_alpha: Some(image.colorspace().has_alpha()),
-        frame_count: u32::try_from(image.frames_len()).ok(),
-    })
-}
-
 pub(crate) fn output_properties(
     image: &Image,
     config: &EncoderConfig,
@@ -513,54 +487,12 @@ pub(crate) fn extension_format(path: &Path) -> DomainImageFormat {
         "qoi" => DomainImageFormat::Qoi,
         "avif" => DomainImageFormat::Avif,
         "tif" | "tiff" => DomainImageFormat::Tiff,
+        "svg" | "svgz" => DomainImageFormat::Svg,
         _ => DomainImageFormat::Unknown,
     }
 }
 
-fn detected_format(image: &Image, path: &Path) -> DomainImageFormat {
-    match image.metadata().image_format() {
-        Some(ZuneImageFormat::JPEG) => DomainImageFormat::Jpeg,
-        Some(ZuneImageFormat::PNG) => DomainImageFormat::Png,
-        Some(ZuneImageFormat::WEBP) => DomainImageFormat::WebP,
-        Some(ZuneImageFormat::JPEG_XL) => DomainImageFormat::JpegXl,
-        Some(ZuneImageFormat::Farbfeld) => DomainImageFormat::Farbfeld,
-        Some(ZuneImageFormat::PPM) => DomainImageFormat::Ppm,
-        Some(ZuneImageFormat::QOI) => DomainImageFormat::Qoi,
-        Some(_) | None => extension_format(path),
-    }
-}
-
-fn bit_depth(depth: BitDepth) -> Option<u8> {
-    match depth {
-        BitDepth::Eight => Some(8),
-        BitDepth::Sixteen => Some(16),
-        BitDepth::Float32 => Some(32),
-        BitDepth::Unknown => None,
-        _ => None,
-    }
-}
-
-fn color_space_name(color_space: ColorSpace) -> &'static str {
-    match color_space {
-        ColorSpace::RGB => "rgb",
-        ColorSpace::RGBA => "rgba",
-        ColorSpace::YCbCr => "ycbcr",
-        ColorSpace::Luma => "luma",
-        ColorSpace::LumaA => "luma_alpha",
-        ColorSpace::YCCK => "ycck",
-        ColorSpace::CMYK => "cmyk",
-        ColorSpace::BGR => "bgr",
-        ColorSpace::BGRA => "bgra",
-        ColorSpace::ARGB => "argb",
-        ColorSpace::HSL => "hsl",
-        ColorSpace::HSV => "hsv",
-        ColorSpace::Unknown => "unknown",
-        ColorSpace::MultiBand(_) => "multi_band",
-        _ => "unknown",
-    }
-}
-
-fn resize_dimensions(
+pub(crate) fn resize_dimensions(
     source_width: usize,
     source_height: usize,
     mode: &ResizeMode,

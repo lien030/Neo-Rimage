@@ -1,8 +1,8 @@
 # Corresponding source / 对应源码
 
-Version / 版本: **0.1.0**. Target / 目标平台: **x86_64-pc-windows-msvc**.
+Version / 版本: **0.1.1**. Target / 目标平台: **x86_64-pc-windows-msvc**.
 
-Project source and local modifications / 项目源码及本地修改: [v0.1.0](https://github.com/lien030/Neo-Rimage/tree/v0.1.0); [GitHub source archive / GitHub 源码归档](https://github.com/lien030/Neo-Rimage/archive/refs/tags/v0.1.0.zip).
+Project source and local modifications / 项目源码及本地修改: [v0.1.1](https://github.com/lien030/Neo-Rimage/tree/v0.1.1); [GitHub source archive / GitHub 源码归档](https://github.com/lien030/Neo-Rimage/archive/refs/tags/v0.1.1.zip).
 
 Build instructions / 构建说明: [BUILDING.md](BUILDING.md). Distribution terms / 发行许可: [DISTRIBUTION.md](DISTRIBUTION.md).
 
@@ -26,17 +26,22 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | alloc-stdlib@0.3.0 | BSD-3-Clause | [Source / 源码](https://static.crates.io/crates/alloc-stdlib/alloc-stdlib-0.3.0.crate) | 0b5c1865780388bfa186411ab5f247819487fc4864c6e9c3106611fa347586e1 |
 | Rust | anyhow@1.0.103 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/anyhow/anyhow-1.0.103.crate) | 2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3 |
 | Rust | arg_enum_proc_macro@0.3.4 | MIT | [Source / 源码](https://static.crates.io/crates/arg_enum_proc_macro/arg_enum_proc_macro-0.3.4.crate) | 0ae92a5119aa49cdbcf6b9f893fe4e1d98b04ccbf82ee0584ad948a44a734dea |
+| Rust | arrayref@0.3.9 | BSD-2-Clause | [Source / 源码](https://static.crates.io/crates/arrayref/arrayref-0.3.9.crate) | 76a2e8124351fda1ef8aaaa3bbd7ebbcb486bbcd4225aca0aa0d84bb2db8fecb |
 | Rust | arrayvec@0.7.8 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/arrayvec/arrayvec-0.7.8.crate) | d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56 |
 | Rust | as-slice@0.2.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/as-slice/as-slice-0.2.1.crate) | 516b6b4f0e40d50dcda9365d53964ec74560ad4284da2e7fc97122cd83174516 |
 | Rust | autocfg@1.5.1 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/autocfg/autocfg-1.5.1.crate) | f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53 |
+| Rust | av-data@0.4.4 | MIT | [Source / 源码](https://static.crates.io/crates/av-data/av-data-0.4.4.crate) | fca67ba5d317924c02180c576157afd54babe48a76ebc66ce6d34bb8ba08308e |
 | Rust | av-scenechange@0.14.1 | MIT | [Source / 源码](https://static.crates.io/crates/av-scenechange/av-scenechange-0.14.1.crate) | 0f321d77c20e19b92c39e7471cf986812cbb46659d2af674adc4331ef3f18394 |
 | Rust | av1-grain@0.2.5 | BSD-2-Clause | [Source / 源码](https://static.crates.io/crates/av1-grain/av1-grain-0.2.5.crate) | 8cfddb07216410377231960af4fcab838eaa12e013417781b78bd95ee22077f8 |
+| Rust | avif-parse@2.1.0 | MPL-2.0 | [Source / 源码](https://static.crates.io/crates/avif-parse/avif-parse-2.1.0.crate) | 048e72663e14be27bfd8a9e01e8a0bf27610511ffd5f74c7955f4e4847ce2530 |
 | Rust | avif-serialize@0.8.9 | BSD-3-Clause | [Source / 源码](https://static.crates.io/crates/avif-serialize/avif-serialize-0.8.9.crate) | e7178fe5f7d460b13895ebb9dcb28a3a6216d2df2574a0806cb51b555d297f38 |
 | Rust | base64@0.22.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/base64/base64-0.22.1.crate) | 72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6 |
+| Rust | base64@0.23.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/base64/base64-0.23.1.crate) | ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5 |
 | Rust | bit-set@0.8.0 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/bit-set/bit-set-0.8.0.crate) | 08807e080ed7f9d5433fa9b275196cfc35414f66a0c79d864dc51a0d825231a3 |
 | Rust | bit-vec@0.8.0 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/bit-vec/bit-vec-0.8.0.crate) | 5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7 |
 | Rust | bitflags@1.3.2 | MIT/Apache-2.0 | [Source / 源码](https://static.crates.io/crates/bitflags/bitflags-1.3.2.crate) | bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a |
 | Rust | bitflags@2.13.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/bitflags/bitflags-2.13.0.crate) | b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8 |
+| Rust | bitreader@0.3.11 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/bitreader/bitreader-0.3.11.crate) | 886559b1e163d56c765bc3a985febb4eee8009f625244511d8ee3c432e08c066 |
 | Rust | bitstream-io@4.10.0 | MIT/Apache-2.0 | [Source / 源码](https://static.crates.io/crates/bitstream-io/bitstream-io-4.10.0.crate) | 7eff00be299a18769011411c9def0d827e8f2d7bf0c3dbf53633147a8867fd1f |
 | Rust | block-buffer@0.10.4 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/block-buffer/block-buffer-0.10.4.crate) | 3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71 |
 | Rust | brotli-decompressor@5.0.3 | BSD-3-Clause/MIT | [Source / 源码](https://static.crates.io/crates/brotli-decompressor/brotli-decompressor-5.0.3.crate) | 3a32acac15fe1967bc3986b2a6347dffc965602354ea6f450ad07e8bfd253583 |
@@ -44,6 +49,8 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | brotli@9.0.0 | BSD-3-Clause AND MIT | [Source / 源码](https://static.crates.io/crates/brotli/brotli-9.0.0.crate) | f8b851b75c23ca7873623d612fe49bd1989aeb03d08fb9432187eb253d3d4c6b |
 | Rust | built@0.8.1 | MIT | [Source / 源码](https://static.crates.io/crates/built/built-0.8.1.crate) | 5c0e531d93d39c34eef561e929e8a7f86d77a5af08aac4f6d6e39976c51858e9 |
 | Rust | bumpalo@3.20.3 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/bumpalo/bumpalo-3.20.3.crate) | 72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649 |
+| Rust | byte-slice-cast@1.2.3 | MIT | [Source / 源码](https://static.crates.io/crates/byte-slice-cast/byte-slice-cast-1.2.3.crate) | 7575182f7272186991736b70173b0ea045398f984bf5ebbb3804736ce1330c9d |
+| Rust | bytemuck_derive@1.12.1 | Zlib OR Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/bytemuck_derive/bytemuck_derive-1.12.1.crate) | 6a1f896587b6f2c069c73d2f0913e2d590c3990285cd2f0b6aa02b786b4c679c |
 | Rust | bytemuck@1.25.0 | Zlib OR Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/bytemuck/bytemuck-1.25.0.crate) | c8efb64bd706a16a1bdde310ae86b351e4d21550d98d056f22f8a7f7a2183fec |
 | Rust | byteorder-lite@0.1.0 | Unlicense OR MIT | [Source / 源码](https://static.crates.io/crates/byteorder-lite/byteorder-lite-0.1.0.crate) | 8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495 |
 | Rust | byteorder@1.5.0 | Unlicense OR MIT | [Source / 源码](https://static.crates.io/crates/byteorder/byteorder-1.5.0.crate) | 1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b |
@@ -54,7 +61,9 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | cargo-platform@0.1.9 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/cargo-platform/cargo-platform-0.1.9.crate) | e35af189006b9c0f00a064685c727031e3ed2d8020f7ba284d78cc2671bd36ea |
 | Rust | cc@1.2.66 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/cc/cc-1.2.66.crate) | f5d6cac793997bd970000024b2934968efe83b382de4fdcf4fcb46b6ee4ad996 |
 | Rust | cfb@0.14.0 | MIT | [Source / 源码](https://static.crates.io/crates/cfb/cfb-0.14.0.crate) | a347dcabdae9c31b0825fd6a8bed285ec9c2acb89c47827126d52fa4f59cece3 |
+| Rust | cfg-expr@0.20.10 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/cfg-expr/cfg-expr-0.20.10.crate) | 9ba9e9ec16c447027685b1f897b720e18e9a8afd00bd7332c483537e38086c9f |
 | Rust | cfg-if@1.0.4 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/cfg-if/cfg-if-1.0.4.crate) | 9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801 |
+| Rust | color_quant@1.1.0 | MIT | [Source / 源码](https://static.crates.io/crates/color_quant/color_quant-1.1.0.crate) | 3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b |
 | Rust | cookie@0.18.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/cookie/cookie-0.18.1.crate) | 4ddef33a339a91ea89fb53151bd0a4689cfce27055c291dfa69945475d22c747 |
 | Rust | cpufeatures@0.2.17 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/cpufeatures/cpufeatures-0.2.17.crate) | 59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280 |
 | Rust | crc32fast@1.5.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/crc32fast/crc32fast-1.5.0.crate) | 9481c1c90cbf2ac953f07c8d4a58aa3945c425b7185c9154d67a65e4230da511 |
@@ -69,6 +78,9 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | darling_core@0.23.0 | MIT | [Source / 源码](https://static.crates.io/crates/darling_core/darling_core-0.23.0.crate) | 9865a50f7c335f53564bb694ef660825eb8610e0a53d3e11bf1b0d3df31e03b0 |
 | Rust | darling_macro@0.23.0 | MIT | [Source / 源码](https://static.crates.io/crates/darling_macro/darling_macro-0.23.0.crate) | ac3984ec7bd6cfa798e62b4a642426a5be0e68f9401cfc2a01e3fa9ea2fcdb8d |
 | Rust | darling@0.23.0 | MIT | [Source / 源码](https://static.crates.io/crates/darling/darling-0.23.0.crate) | 25ae13da2f202d56bd7f91c25fba009e7717a1e4a1cc98a76d844b65ae912e9d |
+| Rust | data-url@0.3.2 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/data-url/data-url-0.3.2.crate) | be1e0bca6c3637f992fc1cc7cbc52a78c1ef6db076dbf1059c4323d6a2048376 |
+| Rust | dav1d-sys@0.8.3 | MIT | [Source / 源码](https://static.crates.io/crates/dav1d-sys/dav1d-sys-0.8.3.crate) | c3c91aea6668645415331133ed6f8ddf0e7f40160cd97a12d59e68716a58704b |
+| Rust | dav1d@0.11.1 | MIT | [Source / 源码](https://static.crates.io/crates/dav1d/dav1d-0.11.1.crate) | 3ee89cb860616069c67520dcd66cacdb900b57c799f634a0eb6d91f6e2a82b61 |
 | Rust | deranged@0.5.8 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/deranged/deranged-0.5.8.crate) | 7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c |
 | Rust | derive_more-impl@2.1.1 | MIT | [Source / 源码](https://static.crates.io/crates/derive_more-impl/derive_more-impl-2.1.1.crate) | 799a97264921d8623a957f6c3b9011f3b5492f557bbb7a5a19b7fa6d06ba8dcb |
 | Rust | derive_more@2.1.1 | MIT | [Source / 源码](https://static.crates.io/crates/derive_more/derive_more-2.1.1.crate) | d751e9e49156b02b44f9c1815bcb94b984cdcc4396ecc32521c739452808b134 |
@@ -89,13 +101,18 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | equator@0.4.2 | MIT | [Source / 源码](https://static.crates.io/crates/equator/equator-0.4.2.crate) | 4711b213838dfee0117e3be6ac926007d7f433d7bbe33595975d4190cb07e6fc |
 | Rust | equivalent@1.0.2 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/equivalent/equivalent-1.0.2.crate) | 877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f |
 | Rust | erased-serde@0.4.10 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/erased-serde/erased-serde-0.4.10.crate) | d2add8a07dd6a8d93ff627029c51de145e12686fbc36ecb298ac22e74cf02dec |
+| Rust | fallible_collections@0.5.2 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/fallible_collections/fallible_collections-0.5.2.crate) | dab93c7205280c4785c44517fe84d99751b81f6deb8450cb196da6be88e332bb |
 | Rust | fast_image_resize@6.1.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/fast_image_resize/fast_image_resize-6.1.0.crate) | e9c50201dc184ba6553da1695aac20a042efffbe2d84542cee31917c86c3ab1e |
 | Rust | fastrand@2.4.1 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/fastrand/fastrand-2.4.1.crate) | 9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6 |
+| Rust | fax@0.2.7 | MIT | [Source / 源码](https://static.crates.io/crates/fax/fax-0.2.7.crate) | caf1079563223d5d59d83c85886a56e586cfd5c1a26292e971a0fa266531ac5a |
 | Rust | fdeflate@0.3.7 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/fdeflate/fdeflate-0.3.7.crate) | 1e6853b52649d4ac5c0bd02320cddc5ba956bdb407c4b75a2c6b75bf51500f8c |
 | Rust | find-msvc-tools@0.1.9 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/find-msvc-tools/find-msvc-tools-0.1.9.crate) | 5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582 |
 | Rust | flate2@1.1.9 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/flate2/flate2-1.1.9.crate) | 843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c |
+| Rust | float-cmp@0.9.0 | MIT | [Source / 源码](https://static.crates.io/crates/float-cmp/float-cmp-0.9.0.crate) | 98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4 |
 | Rust | fnv@1.0.7 | Apache-2.0 / MIT | [Source / 源码](https://static.crates.io/crates/fnv/fnv-1.0.7.crate) | 3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1 |
 | Rust | foldhash@0.2.0 | Zlib | [Source / 源码](https://static.crates.io/crates/foldhash/foldhash-0.2.0.crate) | 77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb |
+| Rust | font-types@0.12.6 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/font-types/font-types-0.12.6.crate) | 6c92d9081c7ab3bd83ef1eecdfad090f3d966e3ce74106779664114cfe1a6274 |
+| Rust | fontdb@0.24.0 | MIT | [Source / 源码](https://static.crates.io/crates/fontdb/fontdb-0.24.0.crate) | 2660c5e9157bf76d2db1294e4a9feba604ef610819a3b591088d0d8392a3290f |
 | Rust | foreign-types-macros@0.2.3 | MIT/Apache-2.0 | [Source / 源码](https://static.crates.io/crates/foreign-types-macros/foreign-types-macros-0.2.3.crate) | 1a5c6c585bc94aaf2c7b51dd4c2ba22680844aba4c687be581871a6f518c5742 |
 | Rust | foreign-types-shared@0.3.1 | MIT/Apache-2.0 | [Source / 源码](https://static.crates.io/crates/foreign-types-shared/foreign-types-shared-0.3.1.crate) | aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b |
 | Rust | foreign-types@0.5.0 | MIT/Apache-2.0 | [Source / 源码](https://static.crates.io/crates/foreign-types/foreign-types-0.5.0.crate) | d737d9aa519fb7b749cbc3b962edcf310a8dd1f4b67c91c4f83975dbdd17d965 |
@@ -103,7 +120,10 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | generic-array@0.14.7 | MIT | [Source / 源码](https://static.crates.io/crates/generic-array/generic-array-0.14.7.crate) | 85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a |
 | Rust | getrandom@0.3.4 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/getrandom/getrandom-0.3.4.crate) | 899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd |
 | Rust | getrandom@0.4.3 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/getrandom/getrandom-0.4.3.crate) | 300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099 |
+| Rust | gif@0.14.2 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/gif/gif-0.14.2.crate) | ee8cfcc411d9adbbaba82fb72661cc1bcca13e8bba98b364e62b2dba8f960159 |
 | Rust | glob@0.3.3 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/glob/glob-0.3.3.crate) | 0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280 |
+| Rust | half@2.7.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/half/half-2.7.1.crate) | 6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b |
+| Rust | harfrust@0.12.0 | MIT | [Source / 源码](https://static.crates.io/crates/harfrust/harfrust-0.12.0.crate) | c03d949a14aa089bbb282f7dd76a498a7f684428e4257202efc119ec010376f9 |
 | Rust | hashbrown@0.12.3 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/hashbrown/hashbrown-0.12.3.crate) | 8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888 |
 | Rust | hashbrown@0.17.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/hashbrown/hashbrown-0.17.1.crate) | ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a |
 | Rust | heck@0.5.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/heck/heck-0.5.0.crate) | 2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea |
@@ -122,6 +142,7 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | idna@1.1.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/idna/idna-1.1.0.crate) | 3b0875f23caa03898994f6ddc501886a45c7d3d62d04d2d90788d47be1b1e4de |
 | Rust | image-webp@0.2.4 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/image-webp/image-webp-0.2.4.crate) | 525e9ff3e1a4be2fbea1fdf0e98686a6d98b4d8f937e1bf7402245af1909e8c3 |
 | Rust | imagequant@4.4.1 | GPL-3.0-or-later | [Source / 源码](https://static.crates.io/crates/imagequant/imagequant-4.4.1.crate) | caf5d73b959dfbe5d6b5cd3ca8de5265c7bc58297f20560a60a1d2ba6a19991f |
+| Rust | imagesize@0.15.0 | MIT | [Source / 源码](https://static.crates.io/crates/imagesize/imagesize-0.15.0.crate) | 65b27460c2c92b037f3f94c538ed9a3342f3fdf923606781629ccb35f82d042a |
 | Rust | imgref@1.12.2 | CC0-1.0 OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/imgref/imgref-1.12.2.crate) | 89194689a993ab15268672e99e7b0e19da2da3268ac682e8f02d29d4d1434cd7 |
 | Rust | indexmap@1.9.3 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/indexmap/indexmap-1.9.3.crate) | bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99 |
 | Rust | indexmap@2.14.0 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/indexmap/indexmap-2.14.0.crate) | d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9 |
@@ -147,8 +168,10 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | jxl-vardct@0.11.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/jxl-vardct/jxl-vardct-0.11.1.crate) | ce72a18c6d3a47172ab6c479be2bdb56f22066b5d7092663f03b4490820b4511 |
 | Rust | kamadak-exif@0.6.1 | BSD-2-Clause | [Source / 源码](https://static.crates.io/crates/kamadak-exif/kamadak-exif-0.6.1.crate) | 1130d80c7374efad55a117d715a3af9368f0fa7a2c54573afc15a188cd984837 |
 | Rust | keyboard-types@0.8.3 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/keyboard-types/keyboard-types-0.8.3.crate) | 0fbe853b403ae61a04233030ae8a79d94975281ed9770a1f9e246732b534b28d |
+| Rust | kurbo@0.13.1 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/kurbo/kurbo-0.13.1.crate) | 4b60dfc32f652b926df6192e55525b16d186c69d47876c3ead4da5cc9f8450e2 |
 | Rust | lcms2-sys@4.0.7 | MIT | [Source / 源码](https://static.crates.io/crates/lcms2-sys/lcms2-sys-4.0.7.crate) | 264db0b78119c5a37d78bb41fb355daab29b3b29430b53cd92e3da51f0ab06cc |
 | Rust | lcms2@6.2.0 | MIT | [Source / 源码](https://static.crates.io/crates/lcms2/lcms2-6.2.0.crate) | 80205450f4d8b4de92f18111de879f3df4a6b728915e89b73c38f7a59a81ad90 |
+| Rust | leb128@0.2.7 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/leb128/leb128-0.2.7.crate) | c83bff1d572d6b9aeef67ddfc8448e4a3737909cb28e81f97c791b9018703e52 |
 | Rust | libc@0.2.186 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/libc/libc-0.2.186.crate) | 68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66 |
 | Rust | libdeflate-sys@1.25.2 | Apache-2.0 | [Source / 源码](https://static.crates.io/crates/libdeflate-sys/libdeflate-sys-1.25.2.crate) | 72753e0008ea87963d2f0770042d0df7abe51fafbb8dcaf618ac440f2f1fec0a |
 | Rust | libdeflater@1.25.2 | Apache-2.0 | [Source / 源码](https://static.crates.io/crates/libdeflater/libdeflater-1.25.2.crate) | d1ee41cf6fb1bb6030dfb59ffb7bc01ab26aade44142084c87f0fc7a1658fe71 |
@@ -191,11 +214,13 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | phf_macros@0.13.1 | MIT | [Source / 源码](https://static.crates.io/crates/phf_macros/phf_macros-0.13.1.crate) | 812f032b54b1e759ccd5f8b6677695d5268c588701effba24601f6932f8269ef |
 | Rust | phf_shared@0.13.1 | MIT | [Source / 源码](https://static.crates.io/crates/phf_shared/phf_shared-0.13.1.crate) | e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266 |
 | Rust | phf@0.13.1 | MIT | [Source / 源码](https://static.crates.io/crates/phf/phf-0.13.1.crate) | c1562dc717473dbaa4c1f85a36410e03c047b2e7df7f45ee938fbef64ae7fadf |
+| Rust | pico-args@0.5.0 | MIT | [Source / 源码](https://static.crates.io/crates/pico-args/pico-args-0.5.0.crate) | 5be167a7af36ee22fe3115051bc51f6e6c7054c9348e28deb4f49bd6f705a315 |
 | Rust | pin-project-lite@0.2.17 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/pin-project-lite/pin-project-lite-0.2.17.crate) | a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd |
 | Rust | pkg-config@0.3.33 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/pkg-config/pkg-config-0.3.33.crate) | 19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e |
 | Rust | plist@1.10.0 | MIT | [Source / 源码](https://static.crates.io/crates/plist/plist-1.10.0.crate) | 7da1d65da6dd5d1e44199ac0f58712d241c0f439f80adea8924d832384087f85 |
 | Rust | png@0.17.16 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/png/png-0.17.16.crate) | 82151a2fc869e011c153adc57cf2789ccb8d9906ce52c0b39a6b5697749d7526 |
 | Rust | png@0.18.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/png/png-0.18.1.crate) | 60769b8b31b2a9f263dae2776c37b1b28ae246943cf719eb6946a1db05128a61 |
+| Rust | polycool@0.4.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/polycool/polycool-0.4.0.crate) | 50596ddc09eb5ad5f75cacd40209568e66df71baf86e1499a0e99c4cff12a5a6 |
 | Rust | potential_utf@0.1.5 | Unicode-3.0 | [Source / 源码](https://static.crates.io/crates/potential_utf/potential_utf-0.1.5.crate) | 0103b1cef7ec0cf76490e969665504990193874ea05c85ff9bab8b911d0a0564 |
 | Rust | powerfmt@0.2.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/powerfmt/powerfmt-0.2.0.crate) | 439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391 |
 | Rust | precomputed-hash@0.1.1 | MIT | [Source / 源码](https://static.crates.io/crates/precomputed-hash/precomputed-hash-0.1.1.crate) | 925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c |
@@ -210,12 +235,16 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | raw-window-handle@0.6.2 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://static.crates.io/crates/raw-window-handle/raw-window-handle-0.6.2.crate) | 20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539 |
 | Rust | rayon-core@1.13.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/rayon-core/rayon-core-1.13.0.crate) | 22e18b0f0062d30d4230b2e85ff77fdfe4326feb054b9783a3460d8435c8ab91 |
 | Rust | rayon@1.12.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/rayon/rayon-1.12.0.crate) | fb39b166781f92d482534ef4b4b1b2568f42613b53e5b6c160e24cfbfa30926d |
+| Rust | read-fonts@0.41.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/read-fonts/read-fonts-0.41.0.crate) | 046a7d674daf459825b32f5062056d6882db0d2f5a479fbd76ccfc870ac18709 |
+| Rust | read-fonts@0.44.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/read-fonts/read-fonts-0.44.0.crate) | d5a0cf4bb6cbce4c29756270d189a5e400ac05e91192161d83a0bcb6e68492e8 |
 | Rust | regex-automata@0.4.15 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/regex-automata/regex-automata-0.4.15.crate) | 1f388202e4b80542a0921078cc23b6333bcf1409c1e3f86404cae4766a6131db |
 | Rust | regex-syntax@0.8.11 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/regex-syntax/regex-syntax-0.8.11.crate) | d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4 |
 | Rust | regex@1.13.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/regex/regex-1.13.0.crate) | 2a0e75113e14dc5acb068cd0786884f214f1312650a3d36d269f5c4f3cdee8a2 |
+| Rust | resvg@0.48.1 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/resvg/resvg-0.48.1.crate) | 67e3803f97b999e80cbf7c6ecdd07a8102204d92e1633cf48783720c521196bd |
 | Rust | rfd@0.16.0 | MIT | [Source / 源码](https://static.crates.io/crates/rfd/rfd-0.16.0.crate) | a15ad77d9e70a92437d8f74c35d99b4e4691128df018833e99f90bcd36152672 |
 | Rust | rgb@0.8.53 | MIT | [Source / 源码](https://static.crates.io/crates/rgb/rgb-0.8.53.crate) | 47b34b781b31e5d73e9fbc8689c70551fd1ade9a19e3e28cfec8580a79290cc4 |
-| Rust | rimage@0.14.0 | MIT OR Apache-2.0 | [Source / 源码](https://github.com/lien030/Neo-Rimage/tree/v0.1.0/src-tauri/vendor/rimage) | Included in project source / 包含于项目源码 |
+| Rust | rimage@0.14.0 | MIT OR Apache-2.0 | [Source / 源码](https://github.com/lien030/Neo-Rimage/tree/v0.1.1/src-tauri/vendor/rimage) | Included in project source / 包含于项目源码 |
+| Rust | roxmltree@0.21.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/roxmltree/roxmltree-0.21.1.crate) | f1964b10c76125c36f8afe190065a4bf9a87bf324842c05701330bba9f1cacbb |
 | Rust | rustc_version@0.4.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/rustc_version/rustc_version-0.4.1.crate) | cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92 |
 | Rust | rustc-hash@2.1.3 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/rustc-hash/rustc-hash-2.1.3.crate) | 6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d |
 | Rust | same-file@1.0.6 | Unlicense/MIT | [Source / 源码](https://static.crates.io/crates/same-file/same-file-1.0.6.crate) | 93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502 |
@@ -241,18 +270,27 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | shlex@2.0.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/shlex/shlex-2.0.1.crate) | f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba |
 | Rust | simd_helpers@0.1.0 | MIT | [Source / 源码](https://static.crates.io/crates/simd_helpers/simd_helpers-0.1.0.crate) | 95890f873bec569a0362c235787f3aca6e1e887302ba4840839bcc6459c42da6 |
 | Rust | simd-adler32@0.3.9 | MIT | [Source / 源码](https://static.crates.io/crates/simd-adler32/simd-adler32-0.3.9.crate) | 703d5c7ef118737c72f1af64ad2f6f8c5e1921f818cdcb97b8fe6fc69bf66214 |
+| Rust | simplecss@0.2.2 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/simplecss/simplecss-0.2.2.crate) | 7a9c6883ca9c3c7c90e888de77b7a5c849c779d25d74a1269b0218b14e8b136c |
 | Rust | siphasher@1.0.3 | MIT/Apache-2.0 | [Source / 源码](https://static.crates.io/crates/siphasher/siphasher-1.0.3.crate) | 8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649 |
+| Rust | skrifa@0.44.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/skrifa/skrifa-0.44.0.crate) | 819ab7d62b1d3e72d9d9dea5650bac30424f9111364bb94928dbf5ecad1baa68 |
+| Rust | skrifa@0.47.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/skrifa/skrifa-0.47.0.crate) | 526e654b303ff4ad73a5a40b25de2b3ce3d039c5e3b6da5f89ae6e57004cb40f |
+| Rust | slotmap@1.1.1 | Zlib | [Source / 源码](https://static.crates.io/crates/slotmap/slotmap-1.1.1.crate) | bdd58c3c93c3d278ca835519292445cb4b0d4dc59ccfdf7ceadaab3f8aeb4038 |
 | Rust | smallvec@1.15.2 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/smallvec/smallvec-1.15.2.crate) | 8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90 |
 | Rust | softbuffer@0.4.8 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/softbuffer/softbuffer-0.4.8.crate) | aac18da81ebbf05109ab275b157c22a653bb3c12cf884450179942f81bcbf6c3 |
 | Rust | stable_deref_trait@1.2.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/stable_deref_trait/stable_deref_trait-1.2.1.crate) | 6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596 |
+| Rust | static_assertions@1.1.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/static_assertions/static_assertions-1.1.0.crate) | a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f |
+| Rust | strict-num@0.1.1 | MIT | [Source / 源码](https://static.crates.io/crates/strict-num/strict-num-0.1.1.crate) | 6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731 |
 | Rust | string_cache_codegen@0.6.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/string_cache_codegen/string_cache_codegen-0.6.1.crate) | 585635e46db231059f76c5849798146164652513eb9e8ab2685939dd90f29b69 |
 | Rust | string_cache@0.9.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/string_cache/string_cache-0.9.0.crate) | a18596f8c785a729f2819c0f6a7eae6ebeebdfffbfe4214ae6b087f690e31901 |
 | Rust | strsim@0.11.1 | MIT | [Source / 源码](https://static.crates.io/crates/strsim/strsim-0.11.1.crate) | 7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f |
+| Rust | svgtypes@0.16.1 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/svgtypes/svgtypes-0.16.1.crate) | 695b5790b3131dafa99b3bbfd25a216edb3d216dad9ca208d4657bfb8f2abc3d |
 | Rust | syn@2.0.118 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/syn/syn-2.0.118.crate) | 1b9ae57f904213ebb649ce6895b8a66c66f0203b9319718f69a5612a065b1422 |
 | Rust | syn@3.0.6 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/syn/syn-3.0.6.crate) | 8593e8e72159ed2257d083c7a454a85cbf854f37a0966d8d483aff8c8a3ebcee |
 | Rust | synstructure@0.13.2 | MIT | [Source / 源码](https://static.crates.io/crates/synstructure/synstructure-0.13.2.crate) | 728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2 |
 | Rust | sysinfo@0.39.6 | MIT | [Source / 源码](https://static.crates.io/crates/sysinfo/sysinfo-0.39.6.crate) | d2071df9448915b71c4fe6d25deaf1c22f12bd234f01540b77312bb8e41361e6 |
+| Rust | system-deps@7.0.8 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/system-deps/system-deps-7.0.8.crate) | 396a35feb67335377e0251fcbc1092fc85c484bd4e3a7a54319399da127796e7 |
 | Rust | tao@0.37.1 | Apache-2.0 | [Source / 源码](https://static.crates.io/crates/tao/tao-0.37.1.crate) | f37f381f4e048e6cdf038b5705f8cf14ad108279d46eb968140a7b291aba9400 |
+| Rust | target-lexicon@0.13.5 | Apache-2.0 WITH LLVM-exception | [Source / 源码](https://static.crates.io/crates/target-lexicon/target-lexicon-0.13.5.crate) | adb6935a6f5c20170eeceb1a3835a49e12e19d792f6dd344ccc76a985ca5a6ca |
 | Rust | tauri-build@2.7.1 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/tauri-build/tauri-build-2.7.1.crate) | 59563ca5b331fd97f27ee9672ec8d36d33bb3c9e2c9f6710a1a5687256052e45 |
 | Rust | tauri-codegen@2.7.1 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/tauri-codegen/tauri-codegen-2.7.1.crate) | e50213e463086ecc283d7e9f51c30cc0fd304ad457425158018be26dbf0d0a80 |
 | Rust | tauri-macros@2.7.1 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/tauri-macros/tauri-macros-2.7.1.crate) | 8129fb43bb6e0d6b73ad3315cd172beaab17cd28899c594b1b32c80edbbfd99c |
@@ -267,10 +305,15 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | tendril@0.5.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/tendril/tendril-0.5.1.crate) | 5fed54709c5b3a53d09bb1c113ea4f5ceafd1e772ddcb0030a82e1d56c087b08 |
 | Rust | thiserror-impl@2.0.18 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/thiserror-impl/thiserror-impl-2.0.18.crate) | ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5 |
 | Rust | thiserror@2.0.18 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/thiserror/thiserror-2.0.18.crate) | 4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4 |
+| Rust | tiff@0.11.3 | MIT | [Source / 源码](https://static.crates.io/crates/tiff/tiff-0.11.3.crate) | b63feaf3343d35b6ca4d50483f94843803b0f51634937cc2ec519fc32232bc52 |
 | Rust | time-core@0.1.9 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/time-core/time-core-0.1.9.crate) | 9e1c906769ad99c88eaa54e728060edef082f8e358ff32030cb7c7d315e81109 |
 | Rust | time-macros@0.2.31 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/time-macros/time-macros-0.2.31.crate) | c431b87111666e491a90baa837f914fb45cd5dc3c268591b0220ff5057f2085f |
 | Rust | time@0.3.53 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/time/time-0.3.53.crate) | 18dfaaeddcb932337b5e7866ee7d0ce9b76d2fd092997146f187ec09b4558a50 |
+| Rust | tiny-skia-path@0.12.0 | BSD-3-Clause | [Source / 源码](https://static.crates.io/crates/tiny-skia-path/tiny-skia-path-0.12.0.crate) | edca365c3faccca67d06593c5980fa6c57687de727a03131735bb85f01fdeeb9 |
+| Rust | tiny-skia@0.12.0 | BSD-3-Clause | [Source / 源码](https://static.crates.io/crates/tiny-skia/tiny-skia-0.12.0.crate) | 47ffee5eaaf5527f630fb0e356b90ebdec84d5d18d937c5e440350f88c5a91ea |
 | Rust | tinystr@0.8.3 | Unicode-3.0 | [Source / 源码](https://static.crates.io/crates/tinystr/tinystr-0.8.3.crate) | c8323304221c2a851516f22236c5722a72eaa19749016521d6dff0824447d96d |
+| Rust | tinyvec_macros@0.1.1 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://static.crates.io/crates/tinyvec_macros/tinyvec_macros-0.1.1.crate) | 1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20 |
+| Rust | tinyvec@1.11.0 | Zlib OR Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/tinyvec/tinyvec-1.11.0.crate) | 3e61e67053d25a4e82c844e8424039d9745781b3fc4f32b8d55ed50f5f667ef3 |
 | Rust | tokio@1.52.3 | MIT | [Source / 源码](https://static.crates.io/crates/tokio/tokio-1.52.3.crate) | 8fc7f01b389ac15039e4dc9531aa973a135d7a4135281b12d7c1bc79fd57fffe |
 | Rust | toml_datetime@1.1.1+spec-1.1.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/toml_datetime/toml_datetime-1.1.1+spec-1.1.0.crate) | 3165f65f62e28e0115a00b2ebdd37eb6f3b641855f9d636d3cd4103767159ad7 |
 | Rust | toml_parser@1.1.2+spec-1.1.0 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/toml_parser/toml_parser-1.1.2+spec-1.1.0.crate) | a2abe9b86193656635d2411dc43050282ca48aa31c2451210f4202550afb7526 |
@@ -280,14 +323,19 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | tracing@0.1.44 | MIT | [Source / 源码](https://static.crates.io/crates/tracing/tracing-0.1.44.crate) | 63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100 |
 | Rust | typeid@1.0.3 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/typeid/typeid-1.0.3.crate) | bc7d623258602320d5c55d1bc22793b57daff0ec7efc270ea7d55ce1d5f5471c |
 | Rust | typenum@1.20.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/typenum/typenum-1.20.1.crate) | b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20 |
+| Rust | unicode-bidi@0.3.18 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/unicode-bidi/unicode-bidi-0.3.18.crate) | 5c1cb5db39152898a79168971543b1cb5020dff7fe43c8dc468b0885f5e29df5 |
 | Rust | unicode-ident@1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 | [Source / 源码](https://static.crates.io/crates/unicode-ident/unicode-ident-1.0.24.crate) | e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75 |
+| Rust | unicode-script@0.5.8 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/unicode-script/unicode-script-0.5.8.crate) | 383ad40bb927465ec0ce7720e033cb4ca06912855fc35db31b5755d0de75b1ee |
 | Rust | unicode-segmentation@1.13.3 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/unicode-segmentation/unicode-segmentation-1.13.3.crate) | c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8 |
+| Rust | unicode-vo@0.1.0 | MIT/Apache-2.0 | [Source / 源码](https://static.crates.io/crates/unicode-vo/unicode-vo-0.1.0.crate) | b1d386ff53b415b7fe27b50bb44679e2cc4660272694b7b6f3326d8480823a94 |
 | Rust | url@2.5.8 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/url/url-2.5.8.crate) | ff67a8a4397373c3ef660812acab3268222035010ab8680ec4215f38ba3d0eed |
 | Rust | urlpattern@0.6.0 | MIT | [Source / 源码](https://static.crates.io/crates/urlpattern/urlpattern-0.6.0.crate) | df16f50ef4cc145211879a3867ba757076b25dfee812040dcb0658bd9ae7904b |
+| Rust | usvg@0.48.1 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/usvg/usvg-0.48.1.crate) | 977d0a4abdef933f424a99fe09f95576e089b90aebc6f016a3bc813762493e91 |
 | Rust | utf8_iter@1.0.4 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/utf8_iter/utf8_iter-1.0.4.crate) | b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be |
 | Rust | uuid@1.23.4 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/uuid/uuid-1.23.4.crate) | bf80a72845275afea99e7f2b434723d3bc7e38470fcd1c7ed39a599c73319a53 |
 | Rust | v_frame@0.3.9 | BSD-2-Clause | [Source / 源码](https://static.crates.io/crates/v_frame/v_frame-0.3.9.crate) | 666b7727c8875d6ab5db9533418d7c764233ac9c0cff1d469aec8fa127597be2 |
 | Rust | version_check@0.9.5 | MIT/Apache-2.0 | [Source / 源码](https://static.crates.io/crates/version_check/version_check-0.9.5.crate) | 0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a |
+| Rust | version-compare@0.2.1 | MIT | [Source / 源码](https://static.crates.io/crates/version-compare/version-compare-0.2.1.crate) | 03c2856837ef78f57382f06b2b8563a2f512f7185d732608fd9176cb3b8edf0e |
 | Rust | vswhom-sys@0.1.3 | MIT | [Source / 源码](https://static.crates.io/crates/vswhom-sys/vswhom-sys-0.1.3.crate) | fb067e4cbd1ff067d1df46c9194b5de0e98efd2810bbc95c5d5e5f25a3231150 |
 | Rust | vswhom@0.1.0 | MIT | [Source / 源码](https://static.crates.io/crates/vswhom/vswhom-0.1.0.crate) | be979b7f07507105799e854203b470ff7c78a1639e330a58f183b5fea574608b |
 | Rust | walkdir@2.5.0 | Unlicense/MIT | [Source / 源码](https://static.crates.io/crates/walkdir/walkdir-2.5.0.crate) | 29790946404f91d9c5d06f9874efddea1dc06c5efe94541a7d6863108e3a5e4b |
@@ -297,6 +345,7 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | webview2-com-macros@0.8.1 | MIT | [Source / 源码](https://static.crates.io/crates/webview2-com-macros/webview2-com-macros-0.8.1.crate) | 67a921c1b6914c367b2b823cd4cde6f96beec77d30a939c8199bb377cf9b9b54 |
 | Rust | webview2-com-sys@0.39.1 | MIT | [Source / 源码](https://static.crates.io/crates/webview2-com-sys/webview2-com-sys-0.39.1.crate) | b3a07132775117d6065853d9d1178157b8c90e228de47129d6bce2c7edebedfb |
 | Rust | webview2-com@0.39.1 | MIT | [Source / 源码](https://static.crates.io/crates/webview2-com/webview2-com-0.39.1.crate) | 3f89fca7a704cee10dcb3654c1dbb8941d1783132f1917358af75bec37a7d7e6 |
+| Rust | weezl@0.1.12 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/weezl/weezl-0.1.12.crate) | a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88 |
 | Rust | winapi-util@0.1.11 | Unlicense OR MIT | [Source / 源码](https://static.crates.io/crates/winapi-util/winapi-util-0.1.11.crate) | c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22 |
 | Rust | winapi@0.3.9 | MIT/Apache-2.0 | [Source / 源码](https://static.crates.io/crates/winapi/winapi-0.3.9.crate) | 5c839a674fcd7a98952e593242ea400abe93992746761e38641405d28b00f419 |
 | Rust | window-vibrancy@0.7.1 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/window-vibrancy/window-vibrancy-0.7.1.crate) | 010797bd7c40396fbc59d3105089fed0885fe267a0ef4a0a4646df54e28647f6 |
@@ -325,9 +374,13 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | winresource@0.1.31 | MIT | [Source / 源码](https://static.crates.io/crates/winresource/winresource-0.1.31.crate) | 0986a8b1d586b7d3e4fe3d9ea39fb451ae22869dcea4aa109d287a374d866087 |
 | Rust | writeable@0.6.3 | Unicode-3.0 | [Source / 源码](https://static.crates.io/crates/writeable/writeable-0.6.3.crate) | 1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4 |
 | Rust | wry@0.57.0 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/wry/wry-0.57.0.crate) | a819957a01b3119af85e638a38d242af76dbc87d130dca67bfd0441072e21ff0 |
+| Rust | xmlwriter@0.1.0 | MIT | [Source / 源码](https://static.crates.io/crates/xmlwriter/xmlwriter-0.1.0.crate) | ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9 |
 | Rust | y4m@0.8.0 | MIT | [Source / 源码](https://static.crates.io/crates/y4m/y4m-0.8.0.crate) | 7a5a4b21e1a62b67a2970e6831bc091d7b87e119e7f9791aef9702e3bef04448 |
 | Rust | yoke-derive@0.8.2 | Unicode-3.0 | [Source / 源码](https://static.crates.io/crates/yoke-derive/yoke-derive-0.8.2.crate) | de844c262c8848816172cef550288e7dc6c7b7814b4ee56b3e1553f275f1858e |
 | Rust | yoke@0.8.3 | Unicode-3.0 | [Source / 源码](https://static.crates.io/crates/yoke/yoke-0.8.3.crate) | 709fe23a0424b6a435d82152b1bd3fdfb0833487d5fa90d05d42762a9891fef5 |
+| Rust | yuvutils-rs@0.8.3 | BSD-3-Clause OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/yuvutils-rs/yuvutils-rs-0.8.3.crate) | 5b699b6503cd14c70b258eaffedd7ada5a781ea23206eeb9066736b99ba37af1 |
+| Rust | zerocopy-derive@0.8.54 | BSD-2-Clause OR Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/zerocopy-derive/zerocopy-derive-0.8.54.crate) | e2e817b7b52d0c7358d3246da9d69935ebb18116b2b102b4230dac079b4862f5 |
+| Rust | zerocopy@0.8.54 | BSD-2-Clause OR Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/zerocopy/zerocopy-0.8.54.crate) | b7cbbc0a705a0fd05cc3676525980d2bf5a9bc4adac6d6475209a7887cf59d19 |
 | Rust | zerofrom-derive@0.1.7 | Unicode-3.0 | [Source / 源码](https://static.crates.io/crates/zerofrom-derive/zerofrom-derive-0.1.7.crate) | 11532158c46691caf0f2593ea8358fed6bbf68a0315e80aae9bd41fbade684a1 |
 | Rust | zerofrom@0.1.8 | Unicode-3.0 | [Source / 源码](https://static.crates.io/crates/zerofrom/zerofrom-0.1.8.crate) | 0ec05a11813ea801ff6d75110ad09cd0824ddba17dfe17128ea0d5f68e6c5272 |
 | Rust | zerotrie@0.2.4 | Unicode-3.0 | [Source / 源码](https://static.crates.io/crates/zerotrie/zerotrie-0.2.4.crate) | 0f9152d31db0792fa83f70fb2f83148effb5c1f5b8c7686c3459e361d9bc20bf |
@@ -347,6 +400,7 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | zune-ppm@0.5.1 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://static.crates.io/crates/zune-ppm/zune-ppm-0.5.1.crate) | 6fa3b8ca5bfe13b58735c3c8e56442390946e8e0e0ff50e12b9215afd278d422 |
 | Rust | zune-psd@0.5.1 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://static.crates.io/crates/zune-psd/zune-psd-0.5.1.crate) | 8a518b7a7bee76246a6c783d795c56204cd9184ce0e2e4483717f1b9438c902c |
 | Rust | zune-qoi@0.5.2 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://static.crates.io/crates/zune-qoi/zune-qoi-0.5.2.crate) | cdfb703f475bc1190ebece625c1ddf162214933188a3572af8e8f697ad043d5a |
+| Native static | dav1d@1.5.4 | BSD-2-Clause AND ISC | [Source](https://github.com/videolan/dav1d/archive/1.5.4.tar.gz), commit 54706fc6bc0cdecab7e9593974a4039cc038fca7; [vcpkg recipe](https://github.com/microsoft/vcpkg/tree/2c60af75f9d1ea85143242f92864ffa0dd2f78e7/ports/dav1d) | SHA512 7ee5906640495919462b2242c44a8c3cc577fdda52fc25257792f6df919429d54e4a48c315a7a11759385f044f68d3d6573fd720853f447e2d8520a13693827f |
 | Frontend | @floating-ui/core@1.7.5 | MIT | [Published package / 发布包](https://registry.npmjs.org/@floating-ui/core/-/core-1.7.5.tgz); [Upstream source / 上游源码](https://github.com/floating-ui/floating-ui/archive/d8020ee98c702caa31fa9b4d929ca782c6b58c59.tar.gz) | sha512-1Ih4WTWyw0+lKyFMcBHGbb5U5FtuHJuujoyyr5zTaWS5EYMeT6Jb2AuDeftsCsEuchO+mM2ij5+q9crhydzLhQ== |
 | Frontend | @floating-ui/dom@1.7.6 | MIT | [Published package / 发布包](https://registry.npmjs.org/@floating-ui/dom/-/dom-1.7.6.tgz); [Upstream source / 上游源码](https://github.com/floating-ui/floating-ui/archive/d8020ee98c702caa31fa9b4d929ca782c6b58c59.tar.gz) | sha512-9gZSAI5XM36880PPMm//9dfiEngYoC6Am2izES1FF406YFsjvyBMmeJ2g4SAju3xWwtuynNRFL2s9hgxpLI5SQ== |
 | Frontend | @floating-ui/react-dom@2.1.8 | MIT | [Published package / 发布包](https://registry.npmjs.org/@floating-ui/react-dom/-/react-dom-2.1.8.tgz); [Upstream source / 上游源码](https://github.com/floating-ui/floating-ui/archive/d8020ee98c702caa31fa9b4d929ca782c6b58c59.tar.gz) | sha512-cC52bHwM/n/CxS87FH0yWdngEZrjdtLW/qVruo68qg+prK7ZQ4YGdut2GyDVpoGeAYe/h899rVeOVm6Oi40k2A== |

@@ -1,12 +1,18 @@
-use std::fs::File;
+use std::io::Cursor;
 
 use super::*;
 
 #[test]
 fn decode() {
-    let file_content = File::open("tests/files/avif/f1t.avif").unwrap();
-
-    let decoder = AvifDecoder::try_new(file_content).unwrap();
+    let pixels = vec![rgb::RGBA8::new(255, 0, 0, 128); 48 * 80];
+    let encoded = ravif::Encoder::new()
+        .with_speed(10)
+        .encode_rgba(ravif::Img::new(&pixels, 48, 80))
+        .unwrap();
+    let header = probe(Cursor::new(&encoded.avif_file)).unwrap();
+    assert_eq!(header.width, 48);
+    assert!(header.has_alpha);
+    let decoder = AvifDecoder::try_new(Cursor::new(encoded.avif_file)).unwrap();
 
     let img = Image::from_decoder(decoder).unwrap();
 

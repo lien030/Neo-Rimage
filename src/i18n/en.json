@@ -136,7 +136,15 @@
     "taskCancelled": "The task was cancelled.",
     "unsupportedConfigVersion": "The configuration version is not supported.",
     "validation": "The request contains invalid fields.",
-    "webpSlightLossRequiresLossless": "WebP near-lossless mode requires lossless encoding."
+    "webpSlightLossRequiresLossless": "WebP near-lossless mode requires lossless encoding.",
+    "memoryBudgetExceeded": "This image requires more memory than the shared budget.",
+    "inputByteLimit": "The input exceeds the 256 MiB limit.",
+    "inputPixelLimit": "The image exceeds the decoder pixel limit.",
+    "inputChanged": "The input or its resources changed after inspection. Retry to inspect it again.",
+    "avifUnsupported": "Unsupported or damaged AVIF. Animated and grid AVIF are not supported.",
+    "avifHdrUnsupported": "PQ/HLG HDR AVIF is not supported.",
+    "tiffMultipageUnsupported": "Multi-page TIFF is not supported.",
+    "svgResourceInvalid": "The SVG or a referenced resource is invalid, missing, forbidden or exceeds the safety limits."
   },
   "file": "File",
   "options": "Options",
@@ -170,7 +178,6 @@
   "limitationAnimatedInputRejected": "Animated image input is not supported",
   "limitationIccNotPreserved": "ICC profiles are not preserved",
   "limitationMaximumDimension65535": "Maximum dimension is 65535 px",
-  "limitationAvifInputDecodeUnavailable": "AVIF decoding of inputs is unavailable",
   "limitationMayLosslesslyReducePngProperties": "May losslessly reduce some PNG properties",
   "limitationLosslessOnly": "Lossless only",
   "limitationNormalizesPixelsToRgba16": "Pixels are normalized to 16-bit RGBA",
@@ -267,5 +274,14 @@
   "createTaskErrorDirectoryPicker": "Unable to open the directory picker.",
   "createTaskErrorSuffix": "Suffix cannot contain path separators or reserved filename characters.",
   "createTaskErrorBackupPolicy": "Backup options require the Replace collision policy.",
-  "createTaskErrorUnknown": "The task could not be created. Please try again."
+  "createTaskErrorUnknown": "The task could not be created. Please try again.",
+  "waitingForMemory": "Waiting for memory: {{count}}",
+  "warnings": {
+    "avifIccLimited": "AVIF input ICC profiles cannot be preserved by this decoder.",
+    "avifDepthReduced": "10/12-bit SDR AVIF input was converted to 8-bit RGBA."
+  },
+  "capabilityLimitations": {
+    "avif_static_sdr_only": "AVIF input supports static SDR only; animation, grids and HDR are rejected.",
+    "avif_input_normalizes_rgba8": "AVIF input is decoded as RGBA8; ICC and high-bit-depth fidelity are limited."
+  }
 }

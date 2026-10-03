@@ -48,18 +48,147 @@ pub struct AvifDecoder<R: Read> {
     inner: Vec<u8>,
     dimensions: Option<(usize, usize)>,
     phantom: PhantomData<R>,
+    pixel_limit: u32,
+}
+
+/// AV1 sequence properties inspected without allocating decoded pixels.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AvifHeader {
+    /// Sequence maximum width.
+    pub width: u32,
+    /// Sequence maximum height.
+    pub height: u32,
+    /// Significant bits per channel.
+    pub bit_depth: u8,
+    /// Whether an alpha item is present.
+    pub has_alpha: bool,
+    /// Whether the stream declares a still picture.
+    pub still_picture: bool,
+    /// H.273 transfer characteristic.
+    pub transfer: u8,
+    /// NCLX transfer characteristics declared by container properties.
+    pub container_transfers: Vec<u16>,
+}
+
+/// Inspect sequence headers in a bounded AVIF container.
+pub fn probe(source: impl Read) -> Result<AvifHeader, ImageErrors> {
+    let mut bytes = Vec::new();
+    source.take(256 * 1024 * 1024 + 1).read_to_end(&mut bytes)?;
+    if bytes.len() > 256 * 1024 * 1024 {
+        return Err(decode_error("input byte limit exceeded"));
+    }
+    let mut container_transfers = Vec::new();
+    collect_transfers(&bytes, 0, &mut container_transfers)?;
+    let parsed = avif_parse::read_avif(&mut bytes.as_slice()).map_err(decode_error)?;
+    let metadata = parsed.primary_item_metadata().map_err(decode_error)?;
+    let mut sequence = std::mem::MaybeUninit::<dav1d_sys::Dav1dSequenceHeader>::uninit();
+    let status = unsafe {
+        dav1d_sys::dav1d_parse_sequence_header(
+            sequence.as_mut_ptr(),
+            parsed.primary_item.as_ptr(),
+            parsed.primary_item.len(),
+        )
+    };
+    if status < 0 {
+        return Err(decode_error("invalid AV1 sequence header"));
+    }
+    let sequence = unsafe { sequence.assume_init() };
+    if let Some(alpha) = parsed.alpha_item_metadata().map_err(decode_error)? {
+        if alpha.max_frame_width != metadata.max_frame_width
+            || alpha.max_frame_height != metadata.max_frame_height
+            || !alpha.still_picture
+        {
+            return Err(decode_error("invalid alpha sequence dimensions"));
+        }
+    }
+    Ok(AvifHeader {
+        width: metadata.max_frame_width.get(),
+        height: metadata.max_frame_height.get(),
+        bit_depth: metadata.bit_depth,
+        has_alpha: parsed.alpha_item.is_some(),
+        still_picture: metadata.still_picture,
+        transfer: sequence.trc as u8,
+        container_transfers,
+    })
+}
+
+fn collect_transfers(
+    mut bytes: &[u8],
+    depth: usize,
+    transfers: &mut Vec<u16>,
+) -> Result<(), ImageErrors> {
+    if depth > 4 {
+        return Err(decode_error("excessive container nesting"));
+    }
+    while !bytes.is_empty() {
+        if bytes.len() < 8 {
+            return Err(decode_error("truncated container box"));
+        }
+        let declared = u32::from_be_bytes(bytes[..4].try_into().unwrap());
+        let (size, header) = if declared == 1 {
+            let extended = bytes
+                .get(8..16)
+                .ok_or_else(|| decode_error("truncated box size"))?;
+            (
+                usize::try_from(u64::from_be_bytes(extended.try_into().unwrap()))
+                    .map_err(decode_error)?,
+                16,
+            )
+        } else {
+            (
+                if declared == 0 {
+                    bytes.len()
+                } else {
+                    declared as usize
+                },
+                8,
+            )
+        };
+        if size < header || size > bytes.len() {
+            return Err(decode_error("invalid container box size"));
+        }
+        let payload = &bytes[header..size];
+        match &bytes[4..8] {
+            b"meta" => collect_transfers(
+                payload
+                    .get(4..)
+                    .ok_or_else(|| decode_error("truncated meta box"))?,
+                depth + 1,
+                transfers,
+            )?,
+            b"iprp" | b"ipco" => collect_transfers(payload, depth + 1, transfers)?,
+            b"colr" if payload.starts_with(b"nclx") => {
+                let transfer = payload
+                    .get(6..8)
+                    .ok_or_else(|| decode_error("truncated nclx"))?;
+                transfers.push(u16::from_be_bytes(transfer.try_into().unwrap()));
+            }
+            _ => {}
+        }
+        bytes = &bytes[size..];
+    }
+    Ok(())
 }
 
 impl<R: Read> AvifDecoder<R> {
     /// Create a new avif decoder that reads data from `source`
-    pub fn try_new(mut source: R) -> Result<AvifDecoder<R>, ImageErrors> {
+    pub fn try_new(source: R) -> Result<AvifDecoder<R>, ImageErrors> {
+        Self::try_new_with_limit(source, 100_000_000)
+    }
+
+    /// Construct a decoder with a native maximum decoded pixel count.
+    pub fn try_new_with_limit(source: R, pixel_limit: u32) -> Result<AvifDecoder<R>, ImageErrors> {
         let mut buf = Vec::new();
-        source.read_to_end(&mut buf)?;
+        source.take(256 * 1024 * 1024 + 1).read_to_end(&mut buf)?;
+        if buf.len() > 256 * 1024 * 1024 {
+            return Err(decode_error("input byte limit exceeded"));
+        }
 
         Ok(AvifDecoder {
             inner: buf,
             dimensions: None,
             phantom: PhantomData,
+            pixel_limit: pixel_limit.max(1),
         })
     }
 }
@@ -71,12 +200,12 @@ where
     fn decode(&mut self) -> Result<Image, ImageErrors> {
         let parsed = avif_parse::read_avif(&mut self.inner.as_slice()).map_err(decode_error)?;
 
-        let color = decode_av1_stream(&parsed.primary_item)?;
+        let color = decode_av1_stream_with_limit(&parsed.primary_item, self.pixel_limit)?;
         let alpha = parsed
             .alpha_item
             .as_deref()
             .filter(|stream| !stream.is_empty())
-            .map(decode_av1_stream)
+            .map(|data| decode_av1_stream_with_limit(data, self.pixel_limit))
             .transpose()?;
 
         let rgba = picture_to_rgba(&color, alpha.as_ref(), parsed.premultiplied_alpha)?;
@@ -110,9 +239,11 @@ fn decode_error(err: impl std::fmt::Display) -> ImageErrors {
 /// `max_frame_delay`: it would otherwise hold the picture back until an
 /// end-of-stream drain, and `dav1d_flush` only discards state instead of
 /// draining it.
-fn decode_av1_stream(data: &[u8]) -> Result<Picture, ImageErrors> {
+fn decode_av1_stream_with_limit(data: &[u8], pixel_limit: u32) -> Result<Picture, ImageErrors> {
     let mut settings = dav1d::Settings::new();
     settings.set_max_frame_delay(1);
+    settings.set_n_threads(1);
+    settings.set_frame_size_limit(pixel_limit);
 
     let mut decoder = Decoder::with_settings(&settings).map_err(decode_error)?;
 

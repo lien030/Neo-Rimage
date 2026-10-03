@@ -832,6 +832,11 @@ fn is_supported_input(path: &Path) -> bool {
                     | "psd"
                     | "qoi"
                     | "webp"
+                    | "avif"
+                    | "tif"
+                    | "tiff"
+                    | "svg"
+                    | "svgz"
             )
         })
 }

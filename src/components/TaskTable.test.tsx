@@ -24,7 +24,7 @@ function job(status: JobStatus, totalItems = 1, completedItems = 0): JobSnapshot
     createdAt: 1_000,
     updatedAt: 1_000,
     counts: {
-      total: totalItems, queued: 0, running: 0, cancelling: 0,
+      total: totalItems, queued: 0, waitingForMemory: 0, running: 0, cancelling: 0,
       succeeded: completedItems, failed: 0, cancelled: 0, skipped: 0,
     },
     progress: { completedItems, totalItems, activeItems: 0 },
@@ -138,6 +138,17 @@ describe("TaskTable", () => {
     expect(markup).toContain(count);
     expect(markup).not.toContain(">Progress</th>");
     expect(markup).not.toContain("3 items</p>");
+  });
+
+  it.each(["en", "zh", "ja"])("renders queued memory waits without changing columns in %s", async (language) => {
+    await i18n.changeLanguage(language);
+    const waiting = job("queued", 3);
+    waiting.counts.queued = 3;
+    waiting.counts.waitingForMemory = 2;
+    const markup = renderTable([waiting]);
+    expect(markup).toContain(i18n.t("waitingForMemory", { count: 2 }));
+    expect(markup.match(/<td\b[^>]*>/g)).toHaveLength(4);
+    expect(renderTable([job("queued")])).not.toContain(i18n.t("waitingForMemory", { count: 0 }));
   });
 
   it.each(["en", "zh", "ja"])("localizes structured job errors in %s", async (language) => {

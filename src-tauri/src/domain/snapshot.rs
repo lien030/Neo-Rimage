@@ -30,19 +30,19 @@ impl JobStatus {
         use JobStatus::*;
         matches!(
             (self, next),
-            (Queued, Running | Cancelling | Failed | Cancelled)
-                | (
-                    Running,
-                    Paused | Cancelling | Succeeded | PartiallySucceeded | Failed
-                )
-                | (
-                    Paused,
-                    Running | Cancelling | Succeeded | PartiallySucceeded | Failed
-                )
-                | (
-                    Cancelling,
-                    Succeeded | PartiallySucceeded | Failed | Cancelled
-                )
+            (
+                Queued,
+                Running | Paused | Cancelling | Succeeded | PartiallySucceeded | Failed | Cancelled
+            ) | (
+                Running,
+                Queued | Paused | Cancelling | Succeeded | PartiallySucceeded | Failed
+            ) | (
+                Paused,
+                Queued | Running | Cancelling | Succeeded | PartiallySucceeded | Failed
+            ) | (
+                Cancelling,
+                Succeeded | PartiallySucceeded | Failed | Cancelled
+            )
         )
     }
 }
@@ -161,6 +161,7 @@ pub struct JobSnapshot {
 pub struct JobCounts {
     pub total: u32,
     pub queued: u32,
+    pub waiting_for_memory: u32,
     pub running: u32,
     pub cancelling: u32,
     pub succeeded: u32,
@@ -225,6 +226,7 @@ pub struct ItemSnapshot {
     pub input_path: String,
     pub output_path: Option<String>,
     pub status: ItemStatus,
+    pub queue_reason: Option<QueueReason>,
     pub stage: Option<ProcessingStage>,
     pub progress: Option<ItemProgress>,
     pub worker_slot_id: Option<WorkerSlotId>,
@@ -236,6 +238,15 @@ pub struct ItemSnapshot {
     pub error: Option<AppError>,
     #[serde(default)]
     pub warnings: Vec<EngineWarning>,
+}
+
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QueueReason {
+    Preparing,
+    Memory,
+    Concurrency,
 }
 
 #[cfg_attr(test, derive(ts_rs::TS))]

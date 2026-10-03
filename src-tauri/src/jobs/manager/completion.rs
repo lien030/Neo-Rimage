@@ -113,7 +113,7 @@ fn fail_item_with_internal_error(
     ));
 }
 
-fn fill_error_context(
+pub(super) fn fill_error_context(
     error: &mut AppError,
     job_id: &JobId,
     item_id: &ItemId,

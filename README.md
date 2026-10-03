@@ -20,6 +20,7 @@ Image processing runs locally inside the Rust application using [rimage](https:/
 - **Multiple encoders:** Choose from 10 encoder options, including MozJPEG, AVIF, OxiPNG, WebP, and JPEG XL.
 - **Resize controls:** Set target dimensions, choose a resampling filter, and decide whether upscaling and downscaling are allowed.
 - **Explicit output rules:** Use the source directory or a custom destination, add a filename suffix, preserve directory structure, and choose how to handle filename collisions. Backup options are available when replacing files.
+- **Memory-aware parallelism:** One JobManager owns preparation, worker allocation and a shared memory budget. Memory-waiting items remain queued without occupying workers; smaller images can proceed, with an eight-bypass starvation barrier. Estimates are not an OS-enforced memory limit.
 - **Visible queue and workers:** Follow task progress and worker status, adjust concurrency, and start or pause scheduling with **GO / STOP**.
 - **Multilingual interface:** Switch between English, Simplified Chinese, and Japanese. The window also supports an always-on-top mode.
 
@@ -31,7 +32,7 @@ Image processing runs locally inside the Rust application using [rimage](https:/
 
 ### Input
 
-The current build accepts **JPEG, PNG, WebP, JPEG XL, BMP/DIB, Radiance HDR, PSD, QOI, Farbfeld, and PNM/PPM** files. Decoding is subject to the capabilities and limits of the underlying codecs; accepting a file extension does not guarantee that every variant of that format can be decoded.
+Version **0.1.1** accepts **JPEG, PNG, WebP, JPEG XL, BMP/DIB, Radiance HDR, PSD, QOI, Farbfeld, PNM/PPM, AVIF, TIFF, SVG and SVGZ** files. Decoding is subject to the capabilities and limits of the underlying codecs; accepting a file extension does not guarantee that every variant of that format can be decoded.
 
 ### Output
 
@@ -54,7 +55,9 @@ There are **10 encoder options across 8 output formats**:
 
 - Animated image input is not supported.
 - EXIF metadata is not preserved, and EXIF-based automatic orientation is not implemented. Check the orientation of camera photos before processing.
-- AVIF, SVG, TIFF, and GIF input decoding is not enabled in the current build. AVIF is available as an **output** format.
+- AVIF input supports static SDR only; animations, grids and PQ/HLG HDR are rejected. 10/12-bit input is converted to RGBA8 with a warning; AVIF ICC fidelity is limited.
+- TIFF supports common Deflate/Fax/JPEG/LZW variants, not every TIFF variant. Multi-page files are rejected; Float32 samples are accounted at their actual size.
+- SVG/SVGZ uses cached system fonts and vector-resolution leading resize. Resources must be embedded or inside the source directory tree; network/script access is forbidden. Expanded documents/resources are limited to 64 MiB and nesting to 8 levels. GIF input is not supported.
 
 ## Usage
 
@@ -82,12 +85,15 @@ Use the language menu in the title bar to change the interface language.
 
 On Windows, use the **MSVC Rust toolchain** and install Microsoft C++ Build Tools with the **Desktop development with C++** workload, a Windows SDK, and the Microsoft Edge WebView2 runtime. NASM is recommended on x86/x64 for MozJPEG's SIMD assembly support. Building MSI installers also requires the Windows VBScript optional feature; see the Tauri prerequisites above.
 
+Windows native decoding uses pinned **dav1d 1.5.4**, statically linked with the dynamic MSVC CRT. No dav1d DLL or vcpkg installation is needed at runtime. The helper below bootstraps a pinned vcpkg checkout and leaves caches under `src-tauri/target/native`; environment settings affect only the current process.
+
 ### Run locally
 
 Clone or download this repository, open a terminal in its root directory, and run:
 
-```sh
+```powershell
 pnpm install --frozen-lockfile
+. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri dev
 ```
 
@@ -97,13 +103,15 @@ pnpm tauri dev
 
 Build the desktop application and the platform's configured installer bundles:
 
-```sh
+```powershell
+. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build
 ```
 
 To build only an NSIS installer on Windows:
 
-```sh
+```powershell
+. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build --bundles nsis
 ```
 

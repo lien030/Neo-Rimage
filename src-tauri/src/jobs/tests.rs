@@ -33,7 +33,24 @@ impl SequenceExecutor {
 }
 
 impl Executor for SequenceExecutor {
-    fn execute(&self, task: &ExecutionTask, _context: &ExecutionContext) -> ExecutionOutcome {
+    fn prepare(
+        &self,
+        _task: &ExecutionTask,
+        _budget: u64,
+        _cancellation: &super::CancellationToken,
+    ) -> super::PreparationOutcome {
+        super::PreparationOutcome::Ready(super::PreparedExecution {
+            memory_bytes: 1,
+            payload: Arc::new(()),
+        })
+    }
+
+    fn execute(
+        &self,
+        task: &ExecutionTask,
+        _plan: &super::PreparedExecution,
+        _context: &ExecutionContext,
+    ) -> ExecutionOutcome {
         let mut outcome = self
             .outcomes
             .lock()
@@ -112,7 +129,24 @@ impl GatedExecutor {
 }
 
 impl Executor for GatedExecutor {
-    fn execute(&self, task: &ExecutionTask, context: &ExecutionContext) -> ExecutionOutcome {
+    fn prepare(
+        &self,
+        _task: &ExecutionTask,
+        _budget: u64,
+        _cancellation: &super::CancellationToken,
+    ) -> super::PreparationOutcome {
+        super::PreparationOutcome::Ready(super::PreparedExecution {
+            memory_bytes: 1,
+            payload: Arc::new(()),
+        })
+    }
+
+    fn execute(
+        &self,
+        task: &ExecutionTask,
+        _plan: &super::PreparedExecution,
+        context: &ExecutionContext,
+    ) -> ExecutionOutcome {
         let active = self.active.fetch_add(1, Ordering::AcqRel) + 1;
         self.maximum_active.fetch_max(active, Ordering::AcqRel);
         let _ = self.started.send(task.item.id.clone());
@@ -131,7 +165,24 @@ struct CancellationExecutor {
 }
 
 impl Executor for CancellationExecutor {
-    fn execute(&self, task: &ExecutionTask, context: &ExecutionContext) -> ExecutionOutcome {
+    fn prepare(
+        &self,
+        _task: &ExecutionTask,
+        _budget: u64,
+        _cancellation: &super::CancellationToken,
+    ) -> super::PreparationOutcome {
+        super::PreparationOutcome::Ready(super::PreparedExecution {
+            memory_bytes: 1,
+            payload: Arc::new(()),
+        })
+    }
+
+    fn execute(
+        &self,
+        task: &ExecutionTask,
+        _plan: &super::PreparedExecution,
+        context: &ExecutionContext,
+    ) -> ExecutionOutcome {
         let _ = self.started.send(task.item.id.clone());
         if context.cancellation.wait_cancelled(TEST_TIMEOUT) {
             ExecutionOutcome::Cancelled
@@ -149,7 +200,24 @@ impl Executor for CancellationExecutor {
 struct ProgressExecutor;
 
 impl Executor for ProgressExecutor {
-    fn execute(&self, task: &ExecutionTask, context: &ExecutionContext) -> ExecutionOutcome {
+    fn prepare(
+        &self,
+        _task: &ExecutionTask,
+        _budget: u64,
+        _cancellation: &super::CancellationToken,
+    ) -> super::PreparationOutcome {
+        super::PreparationOutcome::Ready(super::PreparedExecution {
+            memory_bytes: 1,
+            payload: Arc::new(()),
+        })
+    }
+
+    fn execute(
+        &self,
+        task: &ExecutionTask,
+        _plan: &super::PreparedExecution,
+        context: &ExecutionContext,
+    ) -> ExecutionOutcome {
         let event = EngineProgressEvent::StageProgress {
             progress: ItemProgress {
                 stage: ProcessingStage::Encode,
@@ -168,7 +236,24 @@ impl Executor for ProgressExecutor {
 struct PanicExecutor;
 
 impl Executor for PanicExecutor {
-    fn execute(&self, _task: &ExecutionTask, _context: &ExecutionContext) -> ExecutionOutcome {
+    fn prepare(
+        &self,
+        _task: &ExecutionTask,
+        _budget: u64,
+        _cancellation: &super::CancellationToken,
+    ) -> super::PreparationOutcome {
+        super::PreparationOutcome::Ready(super::PreparedExecution {
+            memory_bytes: 1,
+            payload: Arc::new(()),
+        })
+    }
+
+    fn execute(
+        &self,
+        _task: &ExecutionTask,
+        _plan: &super::PreparedExecution,
+        _context: &ExecutionContext,
+    ) -> ExecutionOutcome {
         panic!("intentional fake executor panic");
     }
 }
@@ -176,7 +261,24 @@ impl Executor for PanicExecutor {
 struct BadIdentityExecutor;
 
 impl Executor for BadIdentityExecutor {
-    fn execute(&self, _task: &ExecutionTask, _context: &ExecutionContext) -> ExecutionOutcome {
+    fn prepare(
+        &self,
+        _task: &ExecutionTask,
+        _budget: u64,
+        _cancellation: &super::CancellationToken,
+    ) -> super::PreparationOutcome {
+        super::PreparationOutcome::Ready(super::PreparedExecution {
+            memory_bytes: 1,
+            payload: Arc::new(()),
+        })
+    }
+
+    fn execute(
+        &self,
+        _task: &ExecutionTask,
+        _plan: &super::PreparedExecution,
+        _context: &ExecutionContext,
+    ) -> ExecutionOutcome {
         ExecutionOutcome::Succeeded(blank_result())
     }
 }
@@ -538,7 +640,7 @@ fn duplicate_progress_is_coalesced_and_revision_stays_monotonic() {
         .expect("job completes");
 
     // submit + dispatch + one unique progress value + terminal transition
-    assert_eq!(manager.snapshot().revision.0, 4);
+    assert_eq!(manager.snapshot().revision.0, 6);
 }
 
 #[test]
@@ -784,4 +886,354 @@ fn blank_result() -> EngineResult {
         warnings: Vec::new(),
         stage_durations_ms: Default::default(),
     }
+}
+
+struct ResourceExecutor {
+    requirements: Vec<u64>,
+    gates: Mutex<std::collections::HashMap<ItemId, Arc<PermitGate>>>,
+    started: Sender<ItemId>,
+    prepared: Sender<(ItemId, u32)>,
+    preparation_gate: Option<Arc<PermitGate>>,
+    preparation_fault: Option<&'static str>,
+}
+
+impl Executor for ResourceExecutor {
+    fn prepare(
+        &self,
+        task: &ExecutionTask,
+        budget: u64,
+        cancellation: &super::CancellationToken,
+    ) -> super::PreparationOutcome {
+        let _ = self.prepared.send((task.item.id.clone(), task.attempt));
+        if let Some(gate) = &self.preparation_gate {
+            if !gate.acquire(&ExecutionContext {
+                cancellation: cancellation.clone(),
+                progress: super::ProgressReporter::new(|_| {}),
+            }) {
+                return super::PreparationOutcome::Cancelled;
+            }
+        }
+        let required = self.requirements[task.item.sequence as usize];
+        match self.preparation_fault {
+            Some("panic") => panic!("preparation panic"),
+            Some("invalid-budget") => return super::PreparationOutcome::NeedsBudget(budget),
+            Some("expand") if required > budget => {
+                return super::PreparationOutcome::NeedsBudget(required)
+            }
+            _ => {}
+        }
+        super::PreparationOutcome::Ready(super::PreparedExecution {
+            memory_bytes: required,
+            payload: Arc::new(()),
+        })
+    }
+    fn execute(
+        &self,
+        task: &ExecutionTask,
+        _plan: &super::PreparedExecution,
+        context: &ExecutionContext,
+    ) -> ExecutionOutcome {
+        let gate = Arc::new(PermitGate::default());
+        self.gates
+            .lock()
+            .unwrap()
+            .insert(task.item.id.clone(), gate.clone());
+        self.started.send(task.item.id.clone()).unwrap();
+        if gate.acquire(context) {
+            ExecutionOutcome::Succeeded(engine_result(task))
+        } else {
+            ExecutionOutcome::Cancelled
+        }
+    }
+}
+
+fn resource_executor(
+    requirements: Vec<u64>,
+    preparation_gate: Option<Arc<PermitGate>>,
+) -> (
+    Arc<ResourceExecutor>,
+    Receiver<ItemId>,
+    Receiver<(ItemId, u32)>,
+) {
+    let (started, started_receiver) = mpsc::channel();
+    let (prepared, prepared_receiver) = mpsc::channel();
+    (
+        Arc::new(ResourceExecutor {
+            requirements,
+            gates: Mutex::new(Default::default()),
+            started,
+            prepared,
+            preparation_gate,
+            preparation_fault: None,
+        }),
+        started_receiver,
+        prepared_receiver,
+    )
+}
+
+fn wait_until(predicate: impl Fn() -> bool) {
+    let deadline = std::time::Instant::now() + TEST_TIMEOUT;
+    while !predicate() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "condition did not become true"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+
+#[test]
+fn memory_wait_uses_no_worker_and_small_items_bypass_only_eight_times() {
+    assert_memory_fairness(None);
+}
+
+#[test]
+fn expanded_preparation_barrier_does_not_deadlock_a_full_preparation_window() {
+    assert_memory_fairness(Some("expand"));
+}
+
+fn assert_memory_fairness(preparation_fault: Option<&'static str>) {
+    let unit = 1024 * 1024;
+    let mut requirements = vec![unit; 14];
+    requirements[0] = if preparation_fault.is_some() {
+        unit
+    } else {
+        3 * unit
+    };
+    requirements[1] = 4 * unit;
+    let (mut executor, started, _) = resource_executor(requirements, None);
+    Arc::get_mut(&mut executor).unwrap().preparation_fault = preparation_fault;
+    let manager = JobManager::with_memory_budget(
+        executor.clone(),
+        Arc::new(super::SystemClock),
+        2,
+        2,
+        4 * unit,
+    )
+    .unwrap();
+    let job_id = manager.submit(submission("fair-memory", 14)).unwrap();
+    let first = started.recv_timeout(TEST_TIMEOUT).unwrap();
+    assert!(first.as_str().ends_with("item-1"));
+    for index in 3..=10 {
+        let small = started.recv_timeout(TEST_TIMEOUT).unwrap();
+        assert!(small.as_str().ends_with(&format!("item-{index}")));
+        if preparation_fault.is_some() && index == 3 {
+            wait_until(|| manager.resource_state().3 >= 3 && manager.resource_state().2 == 0);
+        }
+        let resources = manager.resource_state();
+        assert!(resources.0 <= resources.1);
+        assert!(resources.2 <= 1);
+        assert!(resources.3 <= 4);
+        if preparation_fault.is_some() {
+            assert!(resources.3 <= 3);
+        }
+        executor.gates.lock().unwrap()[&small].release(1);
+    }
+    wait_until(|| manager.snapshot().scheduler.active_items == 1);
+    assert!(started.try_recv().is_err());
+    let waiting = manager.job_snapshot(&job_id).unwrap();
+    assert!(waiting.counts.waiting_for_memory > 0);
+    assert!(waiting.counts.waiting_for_memory <= waiting.counts.queued);
+    assert_eq!(
+        manager
+            .snapshot()
+            .worker_slots
+            .iter()
+            .filter(|slot| slot.status == WorkerSlotStatus::Idle)
+            .count(),
+        1
+    );
+    executor.gates.lock().unwrap()[&first].release(1);
+    let large = started.recv_timeout(TEST_TIMEOUT).unwrap();
+    assert!(large.as_str().ends_with("item-2"));
+    assert!(manager.shutdown(TEST_TIMEOUT).graceful);
+    assert_eq!(manager.resource_state().0, 0);
+}
+
+#[test]
+fn oversize_item_fails_instead_of_waiting_forever() {
+    let (executor, started, _) = resource_executor(vec![32 * 1024 * 1024], None);
+    let manager = JobManager::with_memory_budget(
+        executor,
+        Arc::new(super::SystemClock),
+        1,
+        1,
+        8 * 1024 * 1024,
+    )
+    .unwrap();
+    let job = manager.submit(submission("oversize", 1)).unwrap();
+    let snapshot = manager.wait_for_job_terminal(&job, TEST_TIMEOUT).unwrap();
+    assert_eq!(snapshot.status, JobStatus::Failed);
+    assert!(started.try_recv().is_err());
+    assert_eq!(manager.resource_state().0, 0);
+}
+
+#[test]
+fn cancelled_preparation_cannot_resurrect_a_retried_or_removed_item() {
+    let gate = Arc::new(PermitGate::default());
+    let (executor, started, prepared) = resource_executor(vec![1024 * 1024], Some(gate.clone()));
+    let manager = JobManager::with_memory_budget(
+        executor,
+        Arc::new(super::SystemClock),
+        1,
+        1,
+        8 * 1024 * 1024,
+    )
+    .unwrap();
+    let job = manager.submit(submission("stale-prepare", 1)).unwrap();
+    let (item, attempt) = prepared.recv_timeout(TEST_TIMEOUT).unwrap();
+    assert_eq!(attempt, 1);
+    assert_eq!(manager.snapshot().scheduler.active_items, 0);
+    manager.pause_job(&job).unwrap();
+    manager.cancel_item(&item).unwrap();
+    manager
+        .retry_job(&job, RetryMode::FailedAndCancelled)
+        .unwrap();
+    let (_, attempt) = prepared.recv_timeout(TEST_TIMEOUT).unwrap();
+    assert_eq!(attempt, 2);
+    manager.pause_job(&job).unwrap();
+    gate.release(1);
+    wait_until(|| manager.resource_state().2 == 0);
+    assert!(started.try_recv().is_err());
+    assert_eq!(
+        manager.job_snapshot(&job).unwrap().status,
+        JobStatus::Paused
+    );
+    manager.resume_job(&job).unwrap();
+    assert_eq!(started.recv_timeout(TEST_TIMEOUT).unwrap(), item);
+    assert!(manager.shutdown(TEST_TIMEOUT).graceful);
+    manager.clear_terminal_jobs(None);
+    assert_eq!(manager.resource_state().0, 0);
+}
+
+#[test]
+fn preparation_window_is_bounded_when_execution_is_memory_blocked() {
+    let unit = 1024 * 1024;
+    let (executor, started, prepared) = resource_executor(vec![6 * unit; 30], None);
+    let manager =
+        JobManager::with_memory_budget(executor, Arc::new(super::SystemClock), 1, 2, 8 * unit)
+            .unwrap();
+    manager.submit(submission("lookahead", 30)).unwrap();
+    started.recv_timeout(TEST_TIMEOUT).unwrap();
+    for _ in 0..5 {
+        prepared.recv_timeout(TEST_TIMEOUT).unwrap();
+    }
+    wait_until(|| manager.resource_state().3 == 4 && manager.resource_state().2 == 0);
+    assert!(prepared.try_recv().is_err());
+    assert!(manager.shutdown(TEST_TIMEOUT).graceful);
+    assert_eq!(manager.resource_state().0, 0);
+}
+
+#[test]
+fn preparation_panics_and_invalid_expansion_release_the_reservation() {
+    for fault in ["panic", "invalid-budget"] {
+        let (mut executor, started, _) = resource_executor(vec![1024 * 1024], None);
+        Arc::get_mut(&mut executor).unwrap().preparation_fault = Some(fault);
+        let manager = JobManager::with_memory_budget(
+            executor,
+            Arc::new(super::SystemClock),
+            1,
+            1,
+            8 * 1024 * 1024,
+        )
+        .unwrap();
+        let job = manager.submit(submission(fault, 1)).unwrap();
+        assert_eq!(
+            manager
+                .wait_for_job_terminal(&job, TEST_TIMEOUT)
+                .unwrap()
+                .status,
+            JobStatus::Failed
+        );
+        assert_eq!(manager.resource_state().0, 0);
+        assert!(started.try_recv().is_err());
+        assert!(manager.shutdown(TEST_TIMEOUT).graceful);
+    }
+}
+
+#[test]
+fn preparation_expansion_returns_to_manager_without_occupying_a_worker() {
+    let (mut executor, started, prepared) = resource_executor(vec![4 * 1024 * 1024], None);
+    Arc::get_mut(&mut executor).unwrap().preparation_fault = Some("expand");
+    let manager = JobManager::with_memory_budget(
+        executor.clone(),
+        Arc::new(super::SystemClock),
+        1,
+        1,
+        8 * 1024 * 1024,
+    )
+    .unwrap();
+    manager.submit(submission("expand", 1)).unwrap();
+    prepared.recv_timeout(TEST_TIMEOUT).unwrap();
+    prepared.recv_timeout(TEST_TIMEOUT).unwrap();
+    let item = started.recv_timeout(TEST_TIMEOUT).unwrap();
+    assert_eq!(manager.resource_state().0, 4 * 1024 * 1024);
+    executor.gates.lock().unwrap()[&item].release(1);
+    assert!(manager.shutdown(TEST_TIMEOUT).graceful);
+    assert_eq!(manager.resource_state().0, 0);
+}
+
+struct DelayedPreparationExecutor {
+    started: Sender<()>,
+    release: Mutex<Receiver<()>>,
+}
+
+impl Executor for DelayedPreparationExecutor {
+    fn prepare(
+        &self,
+        _task: &ExecutionTask,
+        budget: u64,
+        _cancellation: &super::CancellationToken,
+    ) -> super::PreparationOutcome {
+        self.started.send(()).unwrap();
+        self.release
+            .lock()
+            .unwrap()
+            .recv_timeout(TEST_TIMEOUT)
+            .unwrap();
+        super::PreparationOutcome::Ready(super::PreparedExecution {
+            memory_bytes: budget,
+            payload: Arc::new(()),
+        })
+    }
+
+    fn execute(
+        &self,
+        _task: &ExecutionTask,
+        _plan: &super::PreparedExecution,
+        _context: &ExecutionContext,
+    ) -> ExecutionOutcome {
+        panic!("cancelled preparation must not execute")
+    }
+}
+
+#[test]
+fn removed_job_retains_preparation_reservation_until_exit_and_shutdown_waits() {
+    let (started, started_receiver) = mpsc::channel();
+    let (release, release_receiver) = mpsc::channel();
+    let manager = JobManager::with_memory_budget(
+        Arc::new(DelayedPreparationExecutor {
+            started,
+            release: Mutex::new(release_receiver),
+        }),
+        Arc::new(super::SystemClock),
+        1,
+        1,
+        8 * 1024 * 1024,
+    )
+    .unwrap();
+    let job = manager
+        .submit(submission("removed-preparation", 1))
+        .unwrap();
+    started_receiver.recv_timeout(TEST_TIMEOUT).unwrap();
+    manager.cancel_job(&job).unwrap();
+    manager.clear_terminal_jobs(None);
+    assert!(manager.job_snapshot(&job).is_err());
+    assert_eq!(manager.resource_state().0, 1024 * 1024);
+    let report = manager.shutdown(Duration::from_millis(10));
+    assert!(!report.graceful);
+    assert_eq!(report.unfinished_item_ids.len(), 1);
+    release.send(()).unwrap();
+    assert!(manager.shutdown(TEST_TIMEOUT).graceful);
+    assert_eq!(manager.resource_state().0, 0);
 }

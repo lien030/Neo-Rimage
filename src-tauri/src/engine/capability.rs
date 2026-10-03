@@ -48,7 +48,7 @@ fn encoder_capabilities() -> Vec<EncoderCapability> {
             EncoderKind::Avif,
             &["avif"],
             avif_options(),
-            &["avif_input_decode_unavailable"],
+            &["avif_static_sdr_only", "avif_input_normalizes_rgba8"],
         ),
         encoder_capability(
             EncoderKind::OxiPng,

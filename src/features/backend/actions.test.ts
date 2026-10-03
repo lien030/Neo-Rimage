@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/ipc", () => ({
   backendClient: mocks.backendClient,
   generateCorrelationId: mocks.generateCorrelationId,
-  IPC_SCHEMA_VERSION: 1,
+  IPC_SCHEMA_VERSION: 2,
 }));
 
 vi.mock("./runtime", () => ({
@@ -45,7 +45,7 @@ describe("backend actions", () => {
 
     expect(mocks.generateCorrelationId).toHaveBeenCalledWith("request");
     expect(mocks.backendClient.setSchedulerPaused).toHaveBeenCalledWith({
-      schemaVersion: 1,
+      schemaVersion: 2,
       correlationId: "correlation-test",
       paused: true,
     });
@@ -59,7 +59,7 @@ describe("backend actions", () => {
     await expect(setWorkerCount(4)).resolves.toBe(SNAPSHOT);
 
     expect(mocks.backendClient.setWorkerCount).toHaveBeenCalledWith({
-      schemaVersion: 1,
+      schemaVersion: 2,
       correlationId: "correlation-test",
       desiredConcurrency: 4,
     });

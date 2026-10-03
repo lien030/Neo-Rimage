@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::io::Cursor;
 
 use zune_core::colorspace::ColorSpace;
 use zune_image::image::Image;
@@ -13,7 +13,7 @@ fn max_target_pixels_fits_the_decode_byte_budget() {
 
 #[test]
 fn decode_simple_rect() {
-    let file = File::open("tests/files/svg/rect.svg").unwrap();
+    let file = fixture("rect.svg");
 
     let decoder = SvgDecoder::try_new(file).unwrap();
     let img = Image::from_decoder(decoder).unwrap();
@@ -33,7 +33,7 @@ fn decode_simple_rect() {
 
 #[test]
 fn probe_size_returns_intrinsic_size() {
-    let file = File::open("tests/files/svg/rect.svg").unwrap();
+    let file = fixture("rect.svg");
 
     let size = SvgDecoder::probe_size(file, None).unwrap();
 
@@ -42,7 +42,7 @@ fn probe_size_returns_intrinsic_size() {
 
 #[test]
 fn decode_through_resize_callback() {
-    let file = File::open("tests/files/svg/rect.svg").unwrap();
+    let file = fixture("rect.svg");
 
     let decoder = SvgDecoder::try_new_with_resize(file, None, |size| {
         assert_eq!(size, (100, 50));
@@ -56,7 +56,7 @@ fn decode_through_resize_callback() {
 
 #[test]
 fn decode_with_target_size_renders_at_vector_quality() {
-    let file = File::open("tests/files/svg/rect.svg").unwrap();
+    let file = fixture("rect.svg");
     let options = SvgOptions {
         target_size: Some((200, 100)),
         ..Default::default()
@@ -75,7 +75,7 @@ fn decode_with_target_size_renders_at_vector_quality() {
 
 #[test]
 fn decode_with_target_aspect_ratio() {
-    let file = File::open("tests/files/svg/rect.svg").unwrap();
+    let file = fixture("rect.svg");
     let options = SvgOptions {
         target_size: Some((50, 25)),
         ..Default::default()
@@ -89,7 +89,7 @@ fn decode_with_target_aspect_ratio() {
 
 #[test]
 fn decode_with_exact_target_size() {
-    let file = File::open("tests/files/svg/rect.svg").unwrap();
+    let file = fixture("rect.svg");
     let options = SvgOptions {
         target_size: Some((120, 40)),
         ..Default::default()
@@ -103,7 +103,7 @@ fn decode_with_exact_target_size() {
 
 #[test]
 fn decode_without_viewbox_uses_content_bbox() {
-    let file = File::open("tests/files/svg/no-viewbox.svg").unwrap();
+    let file = fixture("no-viewbox.svg");
 
     let decoder = SvgDecoder::try_new(file).unwrap();
     let img = Image::from_decoder(decoder).unwrap();
@@ -114,7 +114,7 @@ fn decode_without_viewbox_uses_content_bbox() {
 
 #[test]
 fn decode_text_renders_without_error() {
-    let file = File::open("tests/files/svg/text-cjk.svg").unwrap();
+    let file = fixture("text-cjk.svg");
 
     let decoder = SvgDecoder::try_new(file).unwrap();
     let img = Image::from_decoder(decoder).unwrap();
@@ -126,7 +126,7 @@ fn decode_text_renders_without_error() {
 
 #[test]
 fn decode_invalid_svg_errors() {
-    let file = File::open("tests/files/svg/invalid.svg").unwrap();
+    let file = fixture("invalid.svg");
 
     // Parsing happens eagerly when creating the decoder.
     let decoder = SvgDecoder::try_new(file);
@@ -136,7 +136,7 @@ fn decode_invalid_svg_errors() {
 
 #[test]
 fn decode_with_zero_target_size_errors() {
-    let file = File::open("tests/files/svg/rect.svg").unwrap();
+    let file = fixture("rect.svg");
     let options = SvgOptions {
         target_size: Some((0, 100)),
         ..Default::default()
@@ -149,7 +149,7 @@ fn decode_with_zero_target_size_errors() {
 
 #[test]
 fn decode_with_huge_intrinsic_size_errors() {
-    let file = File::open("tests/files/svg/huge-canvas.svg").unwrap();
+    let file = fixture("huge-canvas.svg");
 
     // Parsing succeeds, the oversized render target is rejected instead of
     // attempting a multi-gigabyte allocation.
@@ -160,7 +160,7 @@ fn decode_with_huge_intrinsic_size_errors() {
 
 #[test]
 fn decode_with_oversized_target_size_errors() {
-    let file = File::open("tests/files/svg/rect.svg").unwrap();
+    let file = fixture("rect.svg");
     let options = SvgOptions {
         target_size: Some((u32::MAX, u32::MAX)),
         ..Default::default()
@@ -177,7 +177,7 @@ fn decode_oversized_svg_carries_a_size_limit_marker() {
     // the render target well past `MAX_TARGET_PIXELS`. The error must carry
     // the structured marker so `error::classify_input` can recover a
     // `SizeLimit` failure instead of a generic decode error.
-    let file = File::open("tests/files/svg/huge-canvas.svg").unwrap();
+    let file = fixture("huge-canvas.svg");
     let err = SvgDecoder::try_new(file)
         .err()
         .expect("expected size-limit error");
@@ -201,4 +201,24 @@ fn parse_size_limit_rejects_messages_without_the_marker() {
     assert!(parse_size_limit("plain text").is_none());
     assert!(parse_size_limit("100x100:10000:8000 trailing").is_none());
     assert!(parse_size_limit("").is_none());
+}
+
+fn fixture(name: &str) -> Cursor<Vec<u8>> {
+    let svg = match name {
+        "rect.svg" => {
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><rect width="100" height="50" fill="red"/></svg>"#
+        }
+        "no-viewbox.svg" => {
+            r#"<svg xmlns="http://www.w3.org/2000/svg"><circle cx="120" cy="80" r="40"/></svg>"#
+        }
+        "text-cjk.svg" => {
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"><text x="0" y="30">中文 日本語 ABC</text></svg>"#
+        }
+        "huge-canvas.svg" => {
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="200000" height="100000"/>"#
+        }
+        "invalid.svg" => "<not-svg",
+        _ => panic!("unknown fixture"),
+    };
+    Cursor::new(svg.as_bytes().to_vec())
 }

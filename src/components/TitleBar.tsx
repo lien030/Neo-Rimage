@@ -106,7 +106,7 @@ export default function TitleBar() {
       data-tauri-drag-region="deep"
       className="absolute top-0 -mt-[1px] flex h-14 w-full select-none items-center justify-between px-4"
     >
-      <p className="text-lg font-semibold text-primary">neo-rimage</p>
+      <p className="text-lg font-semibold text-primary">Neo Rimage</p>
       <div className="flex gap-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

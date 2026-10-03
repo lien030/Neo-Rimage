@@ -82,7 +82,7 @@ describe("translation coverage", () => {
   });
 
   it("resolves static translation calls and rejects hardcoded interface prose", () => {
-    const allowedText = new Set(["px", "RGB", "YCbCr", "neo-rimage"]);
+    const allowedText = new Set(["px", "RGB", "YCbCr", "Neo Rimage"]);
     const untranslated: string[] = [];
     const missingKeys: string[] = [];
     for (const file of sourceFiles(frontendRoot).filter(file => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))) {

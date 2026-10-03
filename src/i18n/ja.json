@@ -136,7 +136,15 @@
     "taskCancelled": "タスクはキャンセルされました。",
     "unsupportedConfigVersion": "この設定のバージョンには対応していません。",
     "validation": "リクエストに無効な項目が含まれています。",
-    "webpSlightLossRequiresLossless": "WebP のニアロスレスにはロスレスモードが必要です。"
+    "webpSlightLossRequiresLossless": "WebP のニアロスレスにはロスレスモードが必要です。",
+    "memoryBudgetExceeded": "この画像に必要なメモリは共有予算を超えています。",
+    "inputByteLimit": "入力ファイルが 256 MiB の上限を超えています。",
+    "inputPixelLimit": "画像がデコーダーのピクセル上限を超えています。",
+    "inputChanged": "事前検査後に入力またはリソースが変更されました。再試行して再検査してください。",
+    "avifUnsupported": "AVIF が未対応または破損しています。アニメーションと grid 画像は未対応です。",
+    "avifHdrUnsupported": "PQ/HLG HDR AVIF は未対応です。",
+    "tiffMultipageUnsupported": "複数ページの TIFF は未対応です。",
+    "svgResourceInvalid": "SVG または参照リソースが無効、不足、許可範囲外、または安全上限を超えています。"
   },
   "backupDescription": "入力ファイルの拡張子の後ろに「.backup」を追加します",
   "file": "ファイル",
@@ -171,7 +179,6 @@
   "limitationAnimatedInputRejected": "アニメーション画像には対応していません",
   "limitationIccNotPreserved": "ICCプロファイルは保持されません",
   "limitationMaximumDimension65535": "最大辺は65535ピクセルです",
-  "limitationAvifInputDecodeUnavailable": "AVIF入力のデコードは利用できません",
   "limitationMayLosslesslyReducePngProperties": "一部のPNG属性をロスレスで削減する場合があります",
   "limitationLosslessOnly": "ロスレスのみ",
   "limitationNormalizesPixelsToRgba16": "ピクセルは16ビットRGBAに正規化されます",
@@ -267,5 +274,14 @@
   "createTaskErrorDirectoryPicker": "ディレクトリ選択を開けませんでした。",
   "createTaskErrorSuffix": "サフィックスにパス区切り文字や予約文字は使用できません。",
   "createTaskErrorBackupPolicy": "バックアップには置換ポリシーが必要です。",
-  "createTaskErrorUnknown": "タスクを作成できませんでした。もう一度お試しください。"
+  "createTaskErrorUnknown": "タスクを作成できませんでした。もう一度お試しください。",
+  "waitingForMemory": "メモリ待機：{{count}} 件",
+  "warnings": {
+    "avifIccLimited": "このデコーダーは AVIF 入力の ICC プロファイルを保持できません。",
+    "avifDepthReduced": "10/12 ビット SDR AVIF 入力を 8 ビット RGBA に変換しました。"
+  },
+  "capabilityLimitations": {
+    "avif_static_sdr_only": "AVIF 入力は静止 SDR のみ対応。アニメーション、grid、HDR は拒否します。",
+    "avif_input_normalizes_rgba8": "AVIF 入力を RGBA8 として復号します。ICC と高ビット深度の忠実性には制限があります。"
+  }
 }

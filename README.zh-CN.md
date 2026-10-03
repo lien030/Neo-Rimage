@@ -27,11 +27,17 @@ neo-rimage 是一款基于 **Tauri、React 与 Rust** 的桌面图片处理工�
 
 ![创建任务窗口中的 MozJPEG 编码、尺寸调整与输出设置](docs/assets/readme/create-task-zh.png)
 
+## 并行与资源准入
+
+由现有 JobManager 统一负责预检、worker 分配和共享内存预算。等待内存的图片留在队列，不占 worker；小图可绕过大图，8 次后形成防饥饿屏障。预算属于估算式准入，并非操作系统内存硬上限。
+
+Windows 构建使用固定的 dav1d 1.5.4 静态库与动态 CRT；用户无需另装 dav1d DLL 或 vcpkg。构建脚本的缓存位于 `src-tauri/target/native`，环境仅作用于当前进程。
+
 ## 支持格式
 
 ### 输入
 
-当前构建接受 **JPEG、PNG、WebP、JPEG XL、BMP/DIB、Radiance HDR、PSD、QOI、Farbfeld 和 PNM/PPM** 文件。实际解码能力受底层编解码器支持范围与限制影响；扩展名被接受，并不代表该格式的所有变体都能成功解码。
+**0.1.1** 接受 **JPEG、PNG、WebP、JPEG XL、BMP/DIB、Radiance HDR、PSD、QOI、Farbfeld、PNM/PPM、AVIF、TIFF、SVG 和 SVGZ** 文件。实际解码能力受底层编解码器支持范围与限制影响；扩展名被接受，并不代表该格式的所有变体都能成功解码。
 
 ### 输出
 
@@ -54,7 +60,9 @@ neo-rimage 是一款基于 **Tauri、React 与 Rust** 的桌面图片处理工�
 
 - 不支持动画图片输入。
 - 不保留 EXIF 元数据，也尚未实现基于 EXIF 的自动方向校正。处理相机照片前，请先确认图片方向。
-- 当前构建未启用 AVIF、SVG、TIFF 和 GIF 输入解码。AVIF 可作为**输出格式**使用。
+- AVIF 输入仅支持静态 SDR；拒绝动画、grid 拼图及 PQ/HLG HDR。10/12 位输入转换为 RGBA8 并提示，ICC 保真有限。
+- TIFF 支持常见 Deflate/Fax/JPEG/LZW 变体，不保证支持全部 TIFF；拒绝多页，Float32 按实际像素布局估算内存。
+- SVG/SVGZ 复用系统字体缓存，首个前置缩放直接用于矢量渲染。资源必须内嵌或位于源文件目录树内；禁止网络和脚本。展开内容及资源累计上限 64 MiB，嵌套最多 8 层。仍不支持 GIF 输入。
 
 ## 使用方式
 
@@ -86,8 +94,9 @@ Windows 下请使用 **MSVC Rust 工具链**，安装 Microsoft C++ Build Tools�
 
 克隆或下载本仓库，在项目根目录打开终端后执行：
 
-```sh
+```powershell
 pnpm install --frozen-lockfile
+. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri dev
 ```
 
@@ -97,13 +106,15 @@ pnpm tauri dev
 
 构建桌面应用及当前平台配置的安装包：
 
-```sh
+```powershell
+. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build
 ```
 
 Windows 下若只需要 NSIS 安装包：
 
-```sh
+```powershell
+. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build --bundles nsis
 ```
 

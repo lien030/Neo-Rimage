@@ -136,7 +136,15 @@
     "taskCancelled": "任务已取消。",
     "unsupportedConfigVersion": "不支持此配置版本。",
     "validation": "请求包含无效字段。",
-    "webpSlightLossRequiresLossless": "WebP 近无损选项需要启用无损模式。"
+    "webpSlightLossRequiresLossless": "WebP 近无损选项需要启用无损模式。",
+    "memoryBudgetExceeded": "此图片所需内存超过共享预算。",
+    "inputByteLimit": "输入文件超过 256 MiB 上限。",
+    "inputPixelLimit": "图片超出解码器像素上限。",
+    "inputChanged": "预检后输入文件或资源发生变化，请重试以重新预检。",
+    "avifUnsupported": "AVIF 不受支持或已损坏；不支持动画及 grid 拼图。",
+    "avifHdrUnsupported": "不支持 PQ/HLG HDR AVIF。",
+    "tiffMultipageUnsupported": "不支持多页 TIFF。",
+    "svgResourceInvalid": "SVG 或引用资源无效、缺失、越界或超过安全限制。"
   },
   "file": "文件",
   "options": "选项",
@@ -170,7 +178,6 @@
   "limitationAnimatedInputRejected": "不支持动图输入",
   "limitationIccNotPreserved": "不保留 ICC 配置文件",
   "limitationMaximumDimension65535": "最大边长为 65535 像素",
-  "limitationAvifInputDecodeUnavailable": "无法将 AVIF 作为输入解码",
   "limitationMayLosslesslyReducePngProperties": "可能无损精简部分 PNG 属性",
   "limitationLosslessOnly": "仅支持无损",
   "limitationNormalizesPixelsToRgba16": "像素会规范化为 16 位 RGBA",
@@ -267,5 +274,14 @@
   "createTaskErrorDirectoryPicker": "无法打开目录选择器。",
   "createTaskErrorSuffix": "后缀不能包含路径分隔符或保留文件名字符。",
   "createTaskErrorBackupPolicy": "备份选项需要使用“替换”冲突策略。",
-  "createTaskErrorUnknown": "任务创建失败，请重试。"
+  "createTaskErrorUnknown": "任务创建失败，请重试。",
+  "waitingForMemory": "等待内存：{{count}} 项",
+  "warnings": {
+    "avifIccLimited": "当前解码器无法保留 AVIF 输入的 ICC 配置。",
+    "avifDepthReduced": "10/12 位 SDR AVIF 输入已转换为 8 位 RGBA。"
+  },
+  "capabilityLimitations": {
+    "avif_static_sdr_only": "AVIF 输入仅支持静态 SDR；拒绝动画、grid 拼图及 HDR。",
+    "avif_input_normalizes_rgba8": "AVIF 输入解码为 RGBA8；ICC 与高位深保真有限。"
+  }
 }

@@ -114,6 +114,7 @@ pub(super) fn snapshot_item(item: &ItemRecord, revision: Revision) -> ItemSnapsh
         input_path: path_text(&item.spec.input_path),
         output_path: Some(path_text(&item.spec.output.output_path)),
         status: item.status,
+        queue_reason: (item.status == ItemStatus::Queued).then_some(item.queue_reason),
         stage: item.stage,
         progress: item.progress.clone(),
         worker_slot_id: item.slot_id.clone(),
@@ -138,7 +139,7 @@ pub(super) fn snapshot_item(item: &ItemRecord, revision: Revision) -> ItemSnapsh
 fn job_controls(job: &JobRecord) -> JobControlAvailability {
     let can_retry = job.items.iter().any(|item| item_is_retryable(item, true));
     JobControlAvailability {
-        can_pause: job.status == JobStatus::Running,
+        can_pause: matches!(job.status, JobStatus::Running | JobStatus::Queued),
         can_resume: job.status == JobStatus::Paused,
         can_cancel: !job.status.is_terminal() && job.status != JobStatus::Cancelling,
         can_retry: job.status.is_terminal() && can_retry,

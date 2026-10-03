@@ -38,6 +38,8 @@ describe("homepage translations", () => {
     await i18n.changeLanguage(language);
     const markup = renderToStaticMarkup(<TooltipProvider><App /></TooltipProvider>);
     const text = markup.replace(/<[^>]+>/g, " ");
+    expect(text).toContain("Neo Rimage");
+    expect(text).not.toContain("neo-rimage");
     for (const message of [progress, empty, idle, start]) expect(text).toContain(message);
     if (language !== "en") {
       expect(text).not.toMatch(/\b(Progress|Idle|No backend jobs|SYNC|STOP|GO)\b/);

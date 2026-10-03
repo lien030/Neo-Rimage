@@ -153,6 +153,16 @@ for (const entry of rustPackages.sort((first, second) => `${first.name}@${first.
   await appendNotices(`${key} — ${entry.license || "See source"}`, directory, entry.license_file, upstream);
 }
 
+const native = path.join(root, "src-tauri/target/native");
+const dav1dChecksum = "7ee5906640495919462b2242c44a8c3cc577fdda52fc25257792f6df919429d54e4a48c315a7a11759385f044f68d3d6573fd720853f447e2d8520a13693827f";
+const dav1dArchive = await readFile(path.join(native, "downloads/videolan-dav1d-1.5.4.tar.gz"));
+assert.equal(createHash("sha512").update(dav1dArchive).digest("hex"), dav1dChecksum, "dav1d source archive checksum differs");
+const dav1dPc = await readFile(path.join(native, "vcpkg/installed/x64-windows-static-md/lib/pkgconfig/dav1d.pc"), "utf8");
+assert.match(dav1dPc, /^Version: 1\.5\.4$/m);
+sources.push(`| Native static | dav1d@1.5.4 | BSD-2-Clause AND ISC | [Source](https://github.com/videolan/dav1d/archive/1.5.4.tar.gz), commit 54706fc6bc0cdecab7e9593974a4039cc038fca7; [vcpkg recipe](https://github.com/microsoft/vcpkg/tree/2c60af75f9d1ea85143242f92864ffa0dd2f78e7/ports/dav1d) | SHA512 ${dav1dChecksum} |`);
+notices.push(`\n${"=".repeat(72)}\ndav1d@1.5.4 — BSD-2-Clause AND ISC (static library, dynamic CRT)\n${"=".repeat(72)}\n`);
+appendLicense("dav1d COPYING and x86inc.asm", await readFile(path.join(native, "vcpkg/installed/x64-windows-static-md/share/dav1d/copyright"), "utf8"));
+
 const modules = new Set();
 await build({
   build: { write: false },

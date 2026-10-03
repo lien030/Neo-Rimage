@@ -2,8 +2,11 @@ use std::sync::Arc;
 
 use crate::{
     domain::{EngineRequest, ErrorCategory},
-    engine::{Engine, EngineContext, LocalEngine},
-    jobs::{ExecutionContext, ExecutionOutcome, ExecutionTask, Executor},
+    engine::{Engine, EngineContext, LocalEngine, PrepareError, PreparedInput},
+    jobs::{
+        CancellationToken, ExecutionContext, ExecutionOutcome, ExecutionTask, Executor,
+        PreparationOutcome, PreparedExecution,
+    },
 };
 
 /// Thin adapter that lets JobManager execute the Tauri-independent local
@@ -32,10 +35,48 @@ impl LocalEngineExecutor {
 }
 
 impl Executor for LocalEngineExecutor {
-    fn execute(&self, task: &ExecutionTask, context: &ExecutionContext) -> ExecutionOutcome {
+    fn prepare(
+        &self,
+        task: &ExecutionTask,
+        budget: u64,
+        cancellation: &CancellationToken,
+    ) -> PreparationOutcome {
+        if cancellation.is_cancelled() {
+            return PreparationOutcome::Cancelled;
+        }
+        let result = self.engine.prepare(&build_engine_request(task), budget);
+        if cancellation.is_cancelled() {
+            return PreparationOutcome::Cancelled;
+        }
+        match result {
+            Ok(plan) => PreparationOutcome::Ready(PreparedExecution {
+                memory_bytes: plan.memory_bytes,
+                payload: Arc::new(plan),
+            }),
+            Err(PrepareError::NeedsBudget(bytes)) => PreparationOutcome::NeedsBudget(bytes),
+            Err(PrepareError::Failed(error)) => PreparationOutcome::Failed(error),
+        }
+    }
+    fn execute(
+        &self,
+        task: &ExecutionTask,
+        plan: &PreparedExecution,
+        context: &ExecutionContext,
+    ) -> ExecutionOutcome {
         let request = build_engine_request(task);
         let engine_context = EngineContext::new(&context.progress, &context.cancellation);
-        match self.engine.execute(&request, &engine_context) {
+        let Some(plan) = plan.payload.downcast_ref::<PreparedInput>() else {
+            return ExecutionOutcome::Failed(crate::domain::AppError::new(
+                "engine.invalid_plan",
+                ErrorCategory::Internal,
+                "errors.internalOperationPlan",
+                "Invalid prepared execution plan",
+            ));
+        };
+        match self
+            .engine
+            .execute_prepared(&request, plan, &engine_context)
+        {
             Ok(result) => ExecutionOutcome::Succeeded(result),
             Err(error) if error.category == ErrorCategory::Cancelled => ExecutionOutcome::Cancelled,
             Err(error) => ExecutionOutcome::Failed(error),

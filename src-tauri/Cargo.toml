@@ -1,6 +1,6 @@
 [package]
 name = "neo-rimage"
-version = "0.1.0"
+version = "0.1.1"
 description = "Native image conversion and optimization desktop app powered by rimage"
 license = "MIT"
 edition = "2021"
@@ -32,12 +32,25 @@ rimage = { path = "vendor/rimage", default-features = false, features = [
   "webp",
   "metadata",
   "icc",
+  "avif",
+  "tiff",
+  "svg",
+  "limits",
 ] }
 zune-core = { version = "=0.5.1", features = ["std"] }
 zune-image = { version = "0.5.0", features = ["simd"] }
 mozjpeg = { version = "0.10.13", default-features = false, features = ["with_simd"] }
 ravif = { version = "0.13.0", default-features = false }
 jpeg-encoder = { version = "0.7.1", features = ["simd"] }
+flate2 = "1"
+roxmltree = "0.21.1"
+sha2 = "0.10"
+imagesize = "0.15.0"
+data-url = "0.3.2"
 
 [dev-dependencies]
 ts-rs = { version = "12.0.1", features = ["serde-json-impl"] }
+tiff = { version = "0.11.3", default-features = false, features = ["lzw", "deflate", "fax", "jpeg"] }
+rav1e = { version = "0.8.1", default-features = false }
+avif-serialize = "0.8.9"
+fax = "0.2.7"

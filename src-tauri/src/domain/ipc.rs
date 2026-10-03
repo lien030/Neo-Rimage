@@ -235,7 +235,10 @@ mod tests {
         );
 
         let value = serde_json::to_value(event).expect("serialize event");
-        assert_eq!(value["schemaVersion"], json!(1));
+        assert_eq!(
+            value["schemaVersion"],
+            json!(crate::domain::IPC_SCHEMA_VERSION)
+        );
         assert_eq!(value["revision"], json!(9));
         assert_eq!(value["event"]["kind"], json!("progress_changed"));
     }

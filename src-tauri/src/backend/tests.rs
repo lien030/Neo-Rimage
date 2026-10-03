@@ -255,7 +255,14 @@ fn executor_maps_engine_cancellation_to_manager_cancellation() {
     };
 
     assert_eq!(
-        executor.execute(&task, &context),
+        executor.execute(
+            &task,
+            &crate::jobs::PreparedExecution {
+                memory_bytes: 1,
+                payload: Arc::new(crate::engine::PreparedInput::test_plan())
+            },
+            &context
+        ),
         ExecutionOutcome::Cancelled
     );
     let request = engine
@@ -558,7 +565,7 @@ fn input_preview_reuses_discovery_order_deduplication_and_decoder_whitelist() {
     fs::create_dir_all(directory.path("nested")).unwrap();
     fs::write(directory.path("photo.PNG"), b"fixture").unwrap();
     fs::write(directory.path("nested/画像.ppm"), b"fixture").unwrap();
-    fs::write(directory.path("unsupported.avif"), b"fixture").unwrap();
+    fs::write(directory.path("unsupported.txt"), b"fixture").unwrap();
     let service = BackendService::new(1).unwrap();
     let initial_revision = service.manager().observation_revision().0;
     let response = service
@@ -567,7 +574,7 @@ fn input_preview_reuses_discovery_order_deduplication_and_decoder_whitelist() {
                 directory.path("photo.PNG"),
                 directory.path("./photo.PNG"),
                 directory.path(""),
-                directory.path("unsupported.avif"),
+                directory.path("unsupported.txt"),
                 directory.path("missing.png"),
             ],
             true,
@@ -691,7 +698,19 @@ impl FakeEngine {
 }
 
 impl Engine for FakeEngine {
-    fn execute(&self, request: &EngineRequest, _context: &EngineContext<'_>) -> EngineOutcome {
+    fn prepare(
+        &self,
+        _request: &EngineRequest,
+        _budget: u64,
+    ) -> Result<crate::engine::PreparedInput, crate::engine::PrepareError> {
+        Ok(crate::engine::PreparedInput::test_plan())
+    }
+    fn execute_prepared(
+        &self,
+        request: &EngineRequest,
+        _plan: &crate::engine::PreparedInput,
+        _context: &EngineContext<'_>,
+    ) -> EngineOutcome {
         *self
             .request
             .lock()

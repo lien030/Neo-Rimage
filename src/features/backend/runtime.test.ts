@@ -43,7 +43,7 @@ function deferred<Value>() {
 
 function snapshot(revision: number): BackendSnapshot {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision,
     generatedAt: 1_000,
     scheduler: {
@@ -61,7 +61,7 @@ function snapshot(revision: number): BackendSnapshot {
 
 function stateEvent(revision: number): StateEventEnvelope {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision,
     occurredAt: 1_000,
     correlationId: null,
@@ -77,7 +77,7 @@ describe("backend runtime", () => {
     vi.resetModules();
     vi.resetAllMocks();
     cleanup = null;
-    mocks.getCapabilities.mockResolvedValue({ schemaVersion: 1 });
+    mocks.getCapabilities.mockResolvedValue({ schemaVersion: 2 });
     mocks.getSnapshot.mockResolvedValue(snapshot(0));
     mocks.listenToStateEvents.mockResolvedValue(mocks.unlisten);
     mocks.useEffect.mockImplementation((effect) => {
@@ -133,8 +133,8 @@ describe("backend runtime", () => {
   });
 
   it("rejects an incompatible snapshot without applying it", async () => {
-    mocks.getSnapshot.mockResolvedValueOnce({ ...snapshot(3), schemaVersion: 2 });
-    await expect(runtime.refreshBackendSnapshot()).rejects.toThrow("unsupported schema version 2");
+    mocks.getSnapshot.mockResolvedValueOnce({ ...snapshot(3), schemaVersion: 3 });
+    await expect(runtime.refreshBackendSnapshot()).rejects.toThrow("unsupported schema version 3");
     expect(runtime.backendRuntimeState.snapshot).toBeNull();
     expect(runtime.backendRuntimeState.lastAppliedRevision).toBe(0);
   });
@@ -144,7 +144,7 @@ describe("backend runtime", () => {
     mocks.getCapabilities.mockReturnValueOnce(pending.promise);
     const first = runtime.refreshBackendCapabilities();
     const second = runtime.refreshBackendCapabilities();
-    const incompatible = { schemaVersion: 2 } as BackendCapabilities;
+    const incompatible = { schemaVersion: 3 } as BackendCapabilities;
     const failures = Promise.allSettled([first, second]);
     pending.resolve(incompatible);
     expect((await failures).map((result) => result.status)).toEqual(["rejected", "rejected"]);
@@ -152,7 +152,7 @@ describe("backend runtime", () => {
     expect(mocks.getCapabilities).toHaveBeenCalledOnce();
 
     await runtime.refreshBackendCapabilities();
-    expect(runtime.backendRuntimeState.capabilities?.schemaVersion).toBe(1);
+    expect(runtime.backendRuntimeState.capabilities?.schemaVersion).toBe(2);
   });
 
   it("registers the listener before loading the initial authoritative state", async () => {
@@ -207,7 +207,7 @@ describe("backend runtime", () => {
     runtime.useBackendRuntimeSync();
     await vi.waitFor(() => expect(runtime.backendRuntimeState.syncStatus).toBe("ready"));
     const handleEvent = mocks.listenToStateEvents.mock.calls[0][0];
-    handleEvent({ ...stateEvent(1), schemaVersion: 2 });
+    handleEvent({ ...stateEvent(1), schemaVersion: 3 });
     await vi.waitFor(() => expect(mocks.toastError).toHaveBeenCalledOnce());
     expect(runtime.backendRuntimeState.syncStatus).toBe("needs_resync");
     expect(mocks.getSnapshot).toHaveBeenCalledOnce();

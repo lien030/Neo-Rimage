@@ -109,6 +109,11 @@ export default function TaskTable() {
                 <TableCell style={{ minWidth: 140 }}>
                   <div className="min-w-0">
                     <p className="text-sm">{t("jobStatus." + job.status)}</p>
+                    {job.counts.waitingForMemory > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {t("waitingForMemory", { count: job.counts.waitingForMemory })}
+                      </p>
+                    )}
                     {job.error && (
                       <p className="text-xs text-red-500 truncate">
                         {formatBackendError(job.error, t)}

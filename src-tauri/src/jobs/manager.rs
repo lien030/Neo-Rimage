@@ -6,15 +6,16 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::domain::{
-    AppError, BackendSnapshot, EngineProgressEvent, EngineResult, EngineWarning, ItemId,
-    ItemProgress, ItemSpec, ItemStatus, JobCounts, JobDetailSnapshot, JobId, JobSnapshot, JobSpec,
-    JobStatus, Page, ProcessingStage, ProgressMeasure, Revision, TimestampMs, WorkerSlotId,
-    IPC_SCHEMA_VERSION,
+    AppError, BackendSnapshot, EngineProgressEvent, EngineResult, EngineWarning, ErrorCategory,
+    ItemId, ItemProgress, ItemSpec, ItemStatus, JobCounts, JobDetailSnapshot, JobId, JobSnapshot,
+    JobSpec, JobStatus, Page, ProcessingStage, ProgressMeasure, QueueReason, Revision, TimestampMs,
+    WorkerSlotId, IPC_SCHEMA_VERSION,
 };
 
 use super::{
     CancellationToken, ClearResult, ExecutionContext, ExecutionOutcome, ExecutionTask, Executor,
-    JobSubmission, ManagerError, ProgressReporter, RetryMode, RevisionSubscription, ShutdownReport,
+    JobSubmission, ManagerError, PreparationOutcome, PreparedExecution, ProgressReporter,
+    RetryMode, RevisionSubscription, ShutdownReport,
 };
 
 mod completion;
@@ -22,6 +23,8 @@ mod projection;
 
 use completion::{apply_finished_outcome, panic_message};
 use projection::{snapshot_item, snapshot_job, snapshot_state};
+
+const INITIAL_PREPARATION_BYTES: u64 = 1024 * 1024;
 
 pub trait Clock: Send + Sync + 'static {
     fn now_ms(&self) -> TimestampMs;
@@ -75,6 +78,10 @@ struct State {
     job_order: Vec<JobId>,
     runnable_jobs: VecDeque<JobId>,
     slots: Vec<SlotRecord>,
+    memory_budget: u64,
+    reserved_bytes: u64,
+    preparation: Option<PreparationWork>,
+    next_token: u64,
 }
 
 struct JobRecord {
@@ -100,6 +107,12 @@ struct ItemRecord {
     finished_at: Option<TimestampMs>,
     result: Option<EngineResult>,
     error: Option<AppError>,
+    plan: Option<PreparedExecution>,
+    preparation_budget: u64,
+    preparation_token: Option<u64>,
+    bypasses: u8,
+    reservation: u64,
+    queue_reason: QueueReason,
 }
 
 struct SlotRecord {
@@ -110,6 +123,20 @@ struct SlotRecord {
 struct DispatchWork {
     task: ExecutionTask,
     cancellation: CancellationToken,
+    plan: PreparedExecution,
+}
+
+#[derive(Clone)]
+struct PreparationWork {
+    task: ExecutionTask,
+    cancellation: CancellationToken,
+    token: u64,
+    budget: u64,
+}
+
+enum Work {
+    Prepare(PreparationWork),
+    Execute(DispatchWork),
 }
 
 impl JobManager {
@@ -139,6 +166,22 @@ impl JobManager {
         desired_concurrency: usize,
         maximum_concurrency: usize,
     ) -> Result<Self, ManagerError> {
+        Self::with_memory_budget(
+            executor,
+            clock,
+            desired_concurrency,
+            maximum_concurrency,
+            rimage::limits::SystemBudget::probe(1).per_image_bytes(),
+        )
+    }
+
+    pub fn with_memory_budget(
+        executor: Arc<dyn Executor>,
+        clock: Arc<dyn Clock>,
+        desired_concurrency: usize,
+        maximum_concurrency: usize,
+        memory_budget: u64,
+    ) -> Result<Self, ManagerError> {
         validate_concurrency(desired_concurrency, maximum_concurrency)?;
         let slots = (0..maximum_concurrency)
             .map(|index| SlotRecord {
@@ -162,6 +205,10 @@ impl JobManager {
                     job_order: Vec::new(),
                     runnable_jobs: VecDeque::new(),
                     slots,
+                    memory_budget: memory_budget.max(1),
+                    reserved_bytes: 0,
+                    preparation: None,
+                    next_token: 1,
                 }),
                 state_changed: Condvar::new(),
                 revision_subscribers: Mutex::new(Vec::new()),
@@ -226,6 +273,12 @@ impl JobManager {
                     finished_at: None,
                     result: None,
                     error: None,
+                    plan: None,
+                    preparation_budget: INITIAL_PREPARATION_BYTES,
+                    preparation_token: None,
+                    bypasses: 0,
+                    reservation: 0,
+                    queue_reason: QueueReason::Preparing,
                 }
             })
             .collect();
@@ -392,7 +445,7 @@ impl JobManager {
             .jobs
             .get_mut(job_id)
             .ok_or_else(|| ManagerError::JobNotFound(job_id.clone()))?;
-        if job.status != JobStatus::Running || !job.status.can_transition_to(JobStatus::Paused) {
+        if !matches!(job.status, JobStatus::Running | JobStatus::Queued) {
             return Err(invalid_action(job, "pause"));
         }
         job.paused = true;
@@ -401,6 +454,7 @@ impl JobManager {
         bump_revision(&mut state);
         drop(state);
         announce_current_revision(&self.shared);
+        dispatch(Arc::clone(&self.shared));
         Ok(())
     }
 
@@ -418,7 +472,8 @@ impl JobManager {
             return Err(invalid_action(job, "resume"));
         }
         job.paused = false;
-        transition_job(job, JobStatus::Running);
+        let next_status = derive_job_status(job);
+        transition_job(job, next_status);
         job.updated_at = now;
         enqueue_job_once(&mut state.runnable_jobs, job_id);
         bump_revision(&mut state);
@@ -470,6 +525,11 @@ impl JobManager {
 
         match item.status {
             ItemStatus::Queued => {
+                if let Some(token) = &item.cancellation {
+                    token.cancel();
+                }
+                item.plan = None;
+                item.preparation_token = None;
                 transition_item(item, ItemStatus::Cancelled);
                 item.finished_at = Some(now);
             }
@@ -691,7 +751,7 @@ impl JobManager {
             notify_revision(&self.shared, state.revision);
         }
 
-        while active_items(&state) > 0 {
+        while active_items(&state) > 0 || state.preparation.is_some() {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
                 break;
@@ -702,18 +762,23 @@ impl JobManager {
                 .wait_timeout(state, remaining)
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             state = waited.0;
-            if waited.1.timed_out() && active_items(&state) > 0 {
+            if waited.1.timed_out() && (active_items(&state) > 0 || state.preparation.is_some()) {
                 break;
             }
         }
 
-        let unfinished_item_ids = state
+        let mut unfinished_item_ids = state
             .jobs
             .values()
             .flat_map(|job| &job.items)
             .filter(|item| !item.status.is_terminal())
             .map(|item| item.spec.id.clone())
             .collect::<Vec<_>>();
+        if let Some(work) = &state.preparation {
+            if !unfinished_item_ids.contains(&work.task.item.id) {
+                unfinished_item_ids.push(work.task.item.id.clone());
+            }
+        }
         ShutdownReport {
             graceful: unfinished_item_ids.is_empty(),
             unfinished_item_ids,
@@ -723,6 +788,23 @@ impl JobManager {
     fn next_job_id(&self) -> JobId {
         let sequence = self.shared.next_id.fetch_add(1, Ordering::Relaxed);
         JobId::new(format!("job-{sequence:016x}"))
+    }
+
+    #[cfg(test)]
+    pub(super) fn resource_state(&self) -> (u64, u64, usize, usize) {
+        let state = lock_state(&self.shared.state);
+        let prepared = state
+            .jobs
+            .values()
+            .flat_map(|job| &job.items)
+            .filter(|item| item.status == ItemStatus::Queued && item.plan.is_some())
+            .count();
+        (
+            state.reserved_bytes,
+            state.memory_budget,
+            usize::from(state.preparation.is_some()),
+            prepared,
+        )
     }
 }
 
@@ -823,6 +905,11 @@ fn request_job_cancellation(job: &mut JobRecord, now: TimestampMs) {
     for item in &mut job.items {
         match item.status {
             ItemStatus::Queued => {
+                if let Some(token) = &item.cancellation {
+                    token.cancel();
+                }
+                item.plan = None;
+                item.preparation_token = None;
                 transition_item(item, ItemStatus::Cancelled);
                 item.finished_at = Some(now);
             }
@@ -846,6 +933,12 @@ fn request_job_cancellation(job: &mut JobRecord, now: TimestampMs) {
 }
 
 fn reset_item_for_retry(item: &mut ItemRecord) {
+    item.plan = None;
+    item.preparation_token = None;
+    item.preparation_budget = INITIAL_PREPARATION_BYTES;
+    item.bypasses = 0;
+    item.reservation = 0;
+    item.queue_reason = QueueReason::Preparing;
     item.attempt = item.attempt.saturating_add(1);
     item.status = ItemStatus::Queued;
     item.stage = None;
@@ -895,13 +988,7 @@ fn derive_job_status(job: &JobRecord) -> JobStatus {
         return JobStatus::Running;
     }
     if counts.queued > 0 {
-        return if job.status == JobStatus::Queued
-            && job.items.iter().all(|item| item.started_at.is_none())
-        {
-            JobStatus::Queued
-        } else {
-            JobStatus::Running
-        };
+        return JobStatus::Queued;
     }
     if counts.succeeded + counts.skipped == counts.total {
         return JobStatus::Succeeded;
@@ -921,6 +1008,9 @@ fn count_items(items: &[ItemRecord]) -> JobCounts {
         ..JobCounts::default()
     };
     for item in items {
+        if item.status == ItemStatus::Queued && item.queue_reason == QueueReason::Memory {
+            counts.waiting_for_memory += 1;
+        }
         match item.status {
             ItemStatus::Queued => counts.queued = counts.queued.saturating_add(1),
             ItemStatus::Running => counts.running = counts.running.saturating_add(1),
@@ -947,102 +1037,300 @@ fn dispatch(shared: Arc<Shared>) {
         let now = shared.clock.now_ms();
         let work = {
             let mut state = lock_state(&shared.state);
-            prepare_next_work(&mut state, now)
+            next_work(&mut state, now)
         };
         let Some(work) = work else {
+            announce_current_revision(&shared);
             return;
         };
 
         announce_current_revision(&shared);
-        let item_id = work.task.item.id.clone();
-        let thread_name = format!("neo-rimage-{item_id}");
-        let worker_shared = Arc::clone(&shared);
-        let spawn_result = thread::Builder::new().name(thread_name).spawn(move || {
-            execute_work(worker_shared, work);
-        });
-        if let Err(error) = spawn_result {
-            finish_work(
-                Arc::clone(&shared),
-                item_id,
-                FinishedOutcome::Unavailable(error.to_string()),
-                false,
-            );
+        match work {
+            Work::Execute(work) => {
+                let item_id = work.task.item.id.clone();
+                let worker_shared = Arc::clone(&shared);
+                if let Err(error) = thread::Builder::new()
+                    .name(format!("neo-rimage-{item_id}"))
+                    .spawn(move || {
+                        execute_work(worker_shared, work);
+                    })
+                {
+                    finish_work(
+                        Arc::clone(&shared),
+                        item_id,
+                        FinishedOutcome::Unavailable(error.to_string()),
+                        false,
+                    );
+                }
+            }
+            Work::Prepare(work) => {
+                let token = work.token;
+                let worker_shared = Arc::clone(&shared);
+                if let Err(error) = thread::Builder::new()
+                    .name("neo-rimage-prepare".into())
+                    .spawn(move || {
+                        let outcome =
+                            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                worker_shared.executor.prepare(
+                                    &work.task,
+                                    work.budget,
+                                    &work.cancellation,
+                                )
+                            }))
+                            .unwrap_or_else(|payload| {
+                                PreparationOutcome::Failed(AppError::new(
+                                    "executor.panicked",
+                                    ErrorCategory::Internal,
+                                    "errors.executorPanicked",
+                                    panic_message(payload),
+                                ))
+                            });
+                        finish_preparation(worker_shared, token, outcome);
+                    })
+                {
+                    finish_preparation(
+                        Arc::clone(&shared),
+                        token,
+                        PreparationOutcome::Failed(AppError::new(
+                            "executor.unavailable",
+                            ErrorCategory::Internal,
+                            "errors.executorUnavailable",
+                            error.to_string(),
+                        )),
+                    );
+                }
+            }
         }
     }
 }
 
-fn prepare_next_work(state: &mut State, now: TimestampMs) -> Option<DispatchWork> {
-    if state.shutting_down
-        || state.scheduler_paused
-        || active_items(state) >= state.desired_concurrency
-    {
+fn next_work(state: &mut State, now: TimestampMs) -> Option<Work> {
+    if state.shutting_down || state.scheduler_paused {
         return None;
     }
-    let slot_index = state
-        .slots
+    let available = state.memory_budget.saturating_sub(state.reserved_bytes);
+    let window = state.maximum_concurrency.saturating_mul(2).min(64);
+    let prepared_count = state
+        .jobs
+        .values()
+        .filter(|job| !job.paused && !job.cancel_requested)
+        .flat_map(|job| &job.items)
+        .filter(|item| {
+            item.status == ItemStatus::Queued
+                && (item.plan.is_some()
+                    || item.preparation_token.is_some()
+                    || item.preparation_budget > INITIAL_PREPARATION_BYTES)
+        })
+        .count();
+    let candidates: Vec<_> = state
+        .runnable_jobs
         .iter()
-        .take(state.desired_concurrency)
-        .position(|slot| slot.item_id.is_none())?;
-
-    let mut selected = None;
-    let candidates = state.runnable_jobs.len();
-    for _ in 0..candidates {
-        let job_id = state.runnable_jobs.pop_front()?;
-        let Some(job) = state.jobs.get(&job_id) else {
-            continue;
-        };
-        if job.paused || job.cancel_requested || job.status.is_terminal() {
-            if job.paused {
-                state.runnable_jobs.push_back(job_id);
-            }
-            continue;
-        }
-        if let Some(item_index) = job
-            .items
-            .iter()
-            .position(|item| item.status == ItemStatus::Queued)
-        {
-            if job
-                .items
+        .filter_map(|job_id| {
+            let job = state.jobs.get(job_id)?;
+            (!job.paused && !job.cancel_requested && !job.status.is_terminal())
+                .then_some((job_id, job))
+        })
+        .flat_map(|(job_id, job)| {
+            job.items
                 .iter()
-                .skip(item_index + 1)
-                .any(|item| item.status == ItemStatus::Queued)
-            {
-                state.runnable_jobs.push_back(job_id.clone());
-            }
-            selected = Some((job_id, item_index));
-            break;
+                .enumerate()
+                .filter(|(_, item)| item.status == ItemStatus::Queued)
+                .map(move |(index, _)| (job_id.clone(), index))
+        })
+        .collect();
+    let slot_index = (active_items(state) < state.desired_concurrency)
+        .then(|| {
+            state
+                .slots
+                .iter()
+                .take(state.desired_concurrency)
+                .position(|slot| slot.item_id.is_none())
+        })
+        .flatten();
+    let barrier = state
+        .runnable_jobs
+        .iter()
+        .filter_map(|candidate| state.jobs.get(candidate))
+        .filter(|job| !job.paused && !job.cancel_requested && !job.status.is_terminal())
+        .flat_map(|job| &job.items)
+        .find(|item| item.status == ItemStatus::Queued && item.bypasses >= 8)
+        .map(|item| item.spec.id.clone());
+    let mut blocked = Vec::new();
+    let mut reasons_changed = false;
+    for (job_id, index) in candidates {
+        let item = &mut state.jobs.get_mut(&job_id)?.items[index];
+        if item.preparation_token.is_some() {
+            continue;
         }
+        let required = item
+            .plan
+            .as_ref()
+            .map_or(item.preparation_budget, |plan| plan.memory_bytes);
+        if required > state.memory_budget {
+            item.status = ItemStatus::Failed;
+            item.finished_at = Some(now);
+            item.error = Some(AppError::new(
+                "input.memory_budget_exceeded",
+                ErrorCategory::Input,
+                "errors.memoryBudgetExceeded",
+                "The image requires more memory than the shared budget.",
+            ));
+            item.plan = None;
+            let job = state.jobs.get_mut(&job_id)?;
+            job.status = derive_job_status(job);
+            job.updated_at = now;
+            bump_revision(state);
+            continue;
+        }
+        if required > available {
+            reasons_changed |= item.queue_reason != QueueReason::Memory;
+            item.queue_reason = QueueReason::Memory;
+            blocked.push((job_id, index));
+            continue;
+        }
+        if barrier
+            .as_ref()
+            .is_some_and(|candidate| candidate != &item.spec.id)
+        {
+            continue;
+        }
+        let cancellation = CancellationToken::new();
+        let job = state.jobs.get_mut(&job_id)?;
+        let item = &mut job.items[index];
+        let task = ExecutionTask {
+            job: Arc::clone(&job.spec),
+            item: Arc::clone(&item.spec),
+            attempt: item.attempt,
+        };
+        let work = if item.plan.is_some() {
+            reasons_changed |= item.queue_reason != QueueReason::Concurrency;
+            item.queue_reason = QueueReason::Concurrency;
+            let Some(slot_index) = slot_index else {
+                continue;
+            };
+            let plan = item.plan.take()?;
+            item.status = ItemStatus::Running;
+            item.started_at = Some(now);
+            item.slot_id = Some(state.slots[slot_index].id.clone());
+            item.cancellation = Some(cancellation.clone());
+            item.reservation = required;
+            item.bypasses = 0;
+            state.slots[slot_index].item_id = Some(item.spec.id.clone());
+            job.status = JobStatus::Running;
+            for (blocked_job, blocked_index) in &blocked {
+                let waiting = &mut state.jobs.get_mut(blocked_job)?.items[*blocked_index];
+                waiting.bypasses = waiting.bypasses.saturating_add(1);
+            }
+            Work::Execute(DispatchWork {
+                task,
+                cancellation,
+                plan,
+            })
+        } else {
+            reasons_changed |= item.queue_reason != QueueReason::Preparing;
+            item.queue_reason = QueueReason::Preparing;
+            if state.preparation.is_some()
+                || (prepared_count >= window
+                    && item.preparation_budget == INITIAL_PREPARATION_BYTES)
+            {
+                continue;
+            }
+            let token = state.next_token;
+            state.next_token += 1;
+            item.preparation_token = Some(token);
+            item.cancellation = Some(cancellation.clone());
+            let work = PreparationWork {
+                task,
+                cancellation,
+                token,
+                budget: required,
+            };
+            state.preparation = Some(work.clone());
+            Work::Prepare(work)
+        };
+        state.reserved_bytes += required;
+        state.jobs.get_mut(&job_id)?.updated_at = now;
+        state.runnable_jobs.retain(|candidate| candidate != &job_id);
+        state.runnable_jobs.push_back(job_id);
+        bump_revision(state);
+        return Some(work);
     }
+    if reasons_changed {
+        bump_revision(state);
+    }
+    None
+}
 
-    let (job_id, item_index) = selected?;
-    let slot_id = state.slots[slot_index].id.clone();
-    let cancellation = CancellationToken::new();
-    let job = state.jobs.get_mut(&job_id)?;
-    let (item_id, item_spec, attempt) = {
-        let item = job.items.get_mut(item_index)?;
-        transition_item(item, ItemStatus::Running);
-        item.started_at = Some(now);
-        item.finished_at = None;
-        item.slot_id = Some(slot_id);
-        item.cancellation = Some(cancellation.clone());
-        item.stage = None;
-        item.progress = None;
-        item.warnings.clear();
-        item.result = None;
-        item.error = None;
-        (item.spec.id.clone(), Arc::clone(&item.spec), item.attempt)
-    };
-    transition_job(job, JobStatus::Running);
-    job.updated_at = now;
-    state.slots[slot_index].item_id = Some(item_id);
-    let task = ExecutionTask {
-        job: Arc::clone(&job.spec),
-        item: item_spec,
-        attempt,
-    };
-    bump_revision(state);
-    Some(DispatchWork { task, cancellation })
+fn finish_preparation(shared: Arc<Shared>, token: u64, outcome: PreparationOutcome) {
+    let now = shared.clock.now_ms();
+    {
+        let mut state = lock_state(&shared.state);
+        if state
+            .preparation
+            .as_ref()
+            .is_none_or(|work| work.token != token)
+        {
+            return;
+        }
+        let work = state.preparation.take().unwrap();
+        state.reserved_bytes -= work.budget;
+        if let Some(job) = state.jobs.get_mut(&work.task.job.id) {
+            if let Some(item) = job.items.iter_mut().find(|item| {
+                item.spec.id == work.task.item.id
+                    && item.attempt == work.task.attempt
+                    && item.preparation_token == Some(token)
+                    && item.status == ItemStatus::Queued
+            }) {
+                item.preparation_token = None;
+                item.cancellation = None;
+                match outcome {
+                    PreparationOutcome::Ready(plan) => {
+                        item.plan = Some(plan);
+                        item.queue_reason = QueueReason::Concurrency;
+                    }
+                    PreparationOutcome::NeedsBudget(bytes) if bytes > work.budget => {
+                        item.preparation_budget = bytes;
+                        item.queue_reason = QueueReason::Memory;
+                    }
+                    PreparationOutcome::NeedsBudget(_) => {
+                        item.status = ItemStatus::Failed;
+                        item.error = Some(AppError::new(
+                            "executor.invalid_budget",
+                            ErrorCategory::Internal,
+                            "errors.internalOperationPlan",
+                            "Preparation requested a non-increasing budget.",
+                        ));
+                    }
+                    PreparationOutcome::Failed(error) => {
+                        item.status = ItemStatus::Failed;
+                        item.error = Some(error);
+                    }
+                    PreparationOutcome::Cancelled => {
+                        item.status = ItemStatus::Cancelled;
+                    }
+                }
+                if item.status.is_terminal() {
+                    item.finished_at = Some(now);
+                    if let Some(error) = &mut item.error {
+                        completion::fill_error_context(
+                            error,
+                            &work.task.job.id,
+                            &work.task.item.id,
+                            None,
+                        );
+                        error.context.path.get_or_insert_with(|| {
+                            work.task.item.input_path.to_string_lossy().into_owned()
+                        });
+                    }
+                }
+                job.status = derive_job_status(job);
+                job.updated_at = now;
+            }
+        }
+        bump_revision(&mut state);
+    }
+    announce_current_revision(&shared);
+    dispatch(shared);
 }
 
 // This value is produced and consumed once on the same worker path. Keeping the
@@ -1058,22 +1346,23 @@ fn execute_work(shared: Arc<Shared>, work: DispatchWork) {
     let item_id = work.task.item.id.clone();
     let progress_shared = Arc::clone(&shared);
     let progress_item_id = item_id.clone();
+    let attempt = work.task.attempt;
     let reporter = ProgressReporter::new(move |event| {
-        record_progress(&progress_shared, &progress_item_id, event);
+        record_progress(&progress_shared, &progress_item_id, attempt, event);
     });
     let context = ExecutionContext {
         cancellation: work.cancellation,
         progress: reporter,
     };
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        shared.executor.execute(&work.task, &context)
+        shared.executor.execute(&work.task, &work.plan, &context)
     }))
     .map(FinishedOutcome::Engine)
     .unwrap_or_else(|payload| FinishedOutcome::Panicked(panic_message(payload)));
     finish_work(shared, item_id, outcome, true);
 }
 
-fn record_progress(shared: &Shared, item_id: &ItemId, event: EngineProgressEvent) {
+fn record_progress(shared: &Shared, item_id: &ItemId, attempt: u32, event: EngineProgressEvent) {
     let now = shared.clock.now_ms();
     // Fractional progress can arrive much faster than commands and snapshots.
     // It is deliberately lossy under contention; stage boundaries and warnings
@@ -1096,7 +1385,9 @@ fn record_progress(shared: &Shared, item_id: &ItemId, event: EngineProgressEvent
     let Some(item) = job.items.iter_mut().find(|item| &item.spec.id == item_id) else {
         return;
     };
-    if !matches!(item.status, ItemStatus::Running | ItemStatus::Cancelling) {
+    if item.attempt != attempt
+        || !matches!(item.status, ItemStatus::Running | ItemStatus::Cancelling)
+    {
         return;
     }
 
@@ -1154,7 +1445,7 @@ fn finish_work(shared: Arc<Shared>, item_id: ItemId, outcome: FinishedOutcome, r
             return;
         };
 
-        let slot_id = {
+        let (slot_id, reservation) = {
             let Some(job) = state.jobs.get_mut(&job_id) else {
                 return;
             };
@@ -1166,14 +1457,16 @@ fn finish_work(shared: Arc<Shared>, item_id: ItemId, outcome: FinishedOutcome, r
                 return;
             }
             let slot_id = item.slot_id.take();
+            let reservation = std::mem::take(&mut item.reservation);
             item.cancellation = None;
             item.finished_at = Some(now);
             apply_finished_outcome(item, outcome, cancel_requested, &job_id, &item_id);
             let next_status = derive_job_status(job);
             transition_job(job, next_status);
             job.updated_at = now;
-            slot_id
+            (slot_id, reservation)
         };
+        state.reserved_bytes -= reservation;
 
         if let Some(slot_id) = slot_id {
             if let Some(slot) = state.slots.iter_mut().find(|slot| slot.id == slot_id) {

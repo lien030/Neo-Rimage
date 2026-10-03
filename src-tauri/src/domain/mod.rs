@@ -24,7 +24,7 @@ pub use progress::*;
 pub use snapshot::*;
 
 /// First formal neo-rimage IPC schema.
-pub const IPC_SCHEMA_VERSION: u16 = 1;
+pub const IPC_SCHEMA_VERSION: u16 = 2;
 
 /// Version of the normalized job configuration stored by JobManager.
 pub const JOB_CONFIG_VERSION: u16 = 1;

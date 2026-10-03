@@ -114,6 +114,25 @@ fn parse_tree<R: Read>(
 }
 
 impl SvgDecoder {
+    /// Parser options sharing the process-wide system font cache.
+    pub fn parser_options() -> usvg::Options<'static> {
+        usvg::Options {
+            font_resolver: fonts::font_resolver(),
+            fontdb: fonts::system_fontdb(),
+            ..usvg::Options::default()
+        }
+    }
+
+    /// Render a tree parsed using caller-owned resource resolution rules.
+    pub fn from_tree(tree: usvg::Tree, options: SvgOptions) -> Result<Self, ImageErrors> {
+        let size = tree.size();
+        let target = resolve_target_size(&options, size)?;
+        Ok(Self {
+            tree,
+            intrinsic: (size.width(), size.height()),
+            target,
+        })
+    }
     /// Create a new SVG decoder with default render options.
     pub fn try_new<R: Read>(source: R) -> Result<Self, ImageErrors> {
         Self::try_new_with_options(source, SvgOptions::default())

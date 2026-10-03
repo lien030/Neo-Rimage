@@ -3,7 +3,8 @@ const LIMITATION_I18N_KEYS: Record<string, string> = {
   animated_input_rejected: "limitationAnimatedInputRejected",
   icc_profile_not_preserved: "limitationIccNotPreserved",
   maximum_dimension_65535: "limitationMaximumDimension65535",
-  avif_input_decode_unavailable: "limitationAvifInputDecodeUnavailable",
+  avif_static_sdr_only: "capabilityLimitations.avif_static_sdr_only",
+  avif_input_normalizes_rgba8: "capabilityLimitations.avif_input_normalizes_rgba8",
   may_losslessly_reduce_png_properties:
     "limitationMayLosslesslyReducePngProperties",
   lossless_only: "limitationLosslessOnly",

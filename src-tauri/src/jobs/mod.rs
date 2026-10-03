@@ -10,7 +10,7 @@ mod types;
 
 pub use executor::{
     CancellationToken, ExecutionContext, ExecutionOutcome, ExecutionTask, Executor,
-    ProgressReporter,
+    PreparationOutcome, PreparedExecution, ProgressReporter,
 };
 pub use manager::{Clock, JobManager, SystemClock};
 pub use types::{

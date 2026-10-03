@@ -27,11 +27,17 @@ neo-rimage は、**Tauri、React、Rust** で構築された、画像の一括�
 
 ![新規タスク画面の MozJPEG、リサイズ、出力設定](docs/assets/readme/create-task-ja.png)
 
+## 並列処理とリソース管理
+
+既存の JobManager が事前検査、ワーカー割り当て、共有メモリ予算を統一管理します。メモリ待ちの画像はワーカーを占有せず、小さな画像は先に実行できます。8 回の追い越し後には飢餓防止バリアを設けます。推定による制御であり、OS レベルのメモリ上限ではありません。
+
+Windows は dav1d 1.5.4 を静的リンクし、CRT は動的リンクします。実行時に dav1d DLL や vcpkg は不要です。ビルドキャッシュは `src-tauri/target/native` 内に置き、環境設定は現在のプロセスにのみ適用します。
+
 ## 対応形式
 
 ### 入力
 
-現在のビルドでは **JPEG、PNG、WebP、JPEG XL、BMP/DIB、Radiance HDR、PSD、QOI、Farbfeld、PNM/PPM** のファイルを入力できます。実際のデコード可否は、使用するコーデックの対応範囲と制限に依存します。拡張子が受け付けられても、その形式のすべてのバリエーションをデコードできるとは限りません。
+**0.1.1** では **JPEG、PNG、WebP、JPEG XL、BMP/DIB、Radiance HDR、PSD、QOI、Farbfeld、PNM/PPM、AVIF、TIFF、SVG、SVGZ** を入力できます。実際のデコード可否は、使用するコーデックの対応範囲と制限に依存します。拡張子が受け付けられても、その形式のすべてのバリエーションをデコードできるとは限りません。
 
 ### 出力
 
@@ -54,7 +60,9 @@ neo-rimage は、**Tauri、React、Rust** で構築された、画像の一括�
 
 - アニメーション画像の入力には対応していません。
 - EXIF メタデータは保持されず、EXIF に基づく画像の向きの自動補正も未実装です。カメラで撮影した写真は、処理前に向きを確認してください。
-- 現在のビルドでは AVIF、SVG、TIFF、GIF の入力デコードは有効になっていません。AVIF は**出力形式**として利用できます。
+- AVIF 入力は静止 SDR のみ対応。アニメーション、grid、PQ/HLG HDR を拒否します。10/12 ビット入力は警告付きで RGBA8 に変換し、ICC の忠実性には制限があります。
+- TIFF は一般的な Deflate/Fax/JPEG/LZW に対応しますが、全バリエーションは保証しません。複数ページは拒否し、Float32 は実際のサンプルサイズで見積もります。
+- SVG/SVGZ はシステムフォントのキャッシュを共有し、先頭のリサイズをベクター描画に直接適用します。リソースは埋め込み、または入力ディレクトリ内に限定。ネットワーク・スクリプトは禁止です。展開済みデータとリソースの合計は 64 MiB、ネストは 8 階層まで。GIF 入力は未対応です。
 
 ## 使い方
 
@@ -86,8 +94,9 @@ Windows では **MSVC 版の Rust ツールチェーン**を使用してくだ�
 
 リポジトリをクローンまたはダウンロードし、ルートディレクトリでターミナルを開いて次のコマンドを実行します。
 
-```sh
+```powershell
 pnpm install --frozen-lockfile
+. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri dev
 ```
 
@@ -97,13 +106,15 @@ pnpm tauri dev
 
 デスクトップアプリと、現在のプラットフォームで設定されているインストーラーをビルドします。
 
-```sh
+```powershell
+. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build
 ```
 
 Windows で NSIS インストーラーのみをビルドする場合：
 
-```sh
+```powershell
+. ./tools/build-windows.ps1 -DependenciesOnly
 pnpm tauri build --bundles nsis
 ```
 

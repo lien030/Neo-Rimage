@@ -108,6 +108,8 @@ pub enum ImageFormat {
     Qoi,
     #[serde(rename = "tiff")]
     Tiff,
+    #[serde(rename = "svg")]
+    Svg,
     #[serde(rename = "unknown")]
     Unknown,
 }

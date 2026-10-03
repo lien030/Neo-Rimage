@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -144,10 +145,35 @@ pub enum ExecutionOutcome {
     Skipped,
 }
 
+#[derive(Clone)]
+pub struct PreparedExecution {
+    pub memory_bytes: u64,
+    pub payload: Arc<dyn Any + Send + Sync>,
+}
+
+#[allow(clippy::large_enum_variant)]
+pub enum PreparationOutcome {
+    Ready(PreparedExecution),
+    NeedsBudget(u64),
+    Failed(AppError),
+    Cancelled,
+}
+
 /// Object-safe integration boundary between JobManager and the local engine.
 ///
 /// The implementation in the integration layer converts `ExecutionTask` into
 /// the engine's request type and maps its result to `ExecutionOutcome`.
 pub trait Executor: Send + Sync + 'static {
-    fn execute(&self, task: &ExecutionTask, context: &ExecutionContext) -> ExecutionOutcome;
+    fn prepare(
+        &self,
+        task: &ExecutionTask,
+        budget: u64,
+        cancellation: &CancellationToken,
+    ) -> PreparationOutcome;
+    fn execute(
+        &self,
+        task: &ExecutionTask,
+        plan: &PreparedExecution,
+        context: &ExecutionContext,
+    ) -> ExecutionOutcome;
 }
