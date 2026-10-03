@@ -43,11 +43,8 @@ export function createDefaultCreateTaskForm(): CreateTaskFormValues {
     },
     resize: {
       enabled: false,
-      mode: "exact",
       width: "100",
       height: "100",
-      percent: "100",
-      factor: "1",
       filter: "lanczos3",
       allowUpscale: false,
       allowDownscale: true,
@@ -81,7 +78,6 @@ export const createTaskInputState = proxy<{ files: SelectedInputFile[] }>({
 
 export const createTaskUiState = proxy<CreateTaskUiState>({
   isOpen: false,
-  activeSection: "encoder",
   isSubmitting: false,
   isDirty: false,
   globalError: null,

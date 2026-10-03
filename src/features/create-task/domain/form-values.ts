@@ -10,16 +10,12 @@ import type {
   MozJpegQuantizationTable,
   OutputLocation,
   ResizeFilter,
-  ResizeMode,
 } from "@/lib/ipc/contracts";
 
 export interface ResizeDraftValue {
   enabled: boolean;
-  mode: ResizeMode["kind"];
   width: string;
   height: string;
-  percent: string;
-  factor: string;
   filter: ResizeFilter;
   allowUpscale: boolean;
   allowDownscale: boolean;

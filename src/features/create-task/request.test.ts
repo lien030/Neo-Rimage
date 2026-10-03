@@ -316,11 +316,8 @@ describe("buildCreateJobRequest", () => {
       draftWith({
         resize: {
           enabled: true,
-          mode: "exact",
           width: "640",
           height: "480",
-          percent: "100",
-          factor: "1",
           filter: "lanczos3",
           allowUpscale: false,
           allowDownscale: true,

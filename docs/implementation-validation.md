@@ -106,3 +106,33 @@ pnpm tauri build --debug --bundles nsis
 pnpm audit --prod
 pnpm audit
 ```
+
+## 2026-10-03：前端复杂度清理
+
+本节记录后续清理；前文的升级基线、提交列表和验证结果保持为历史记录。本轮不升级编译工具链，不修改后端、生成合约、vendor 或用户已有的 `.gitignore` 改动，只提交一个 `refactor(frontend)` commit。
+
+### 清理与保留
+
+- 四列任务表直接使用已有 Table 组件渲染，删除未提供实际排序、筛选或拖拽缩放功能的泛型表格适配层，并移除 `@tanstack/react-table` 及其专属传递依赖 `@tanstack/table-core`。本项目不再需要后续 Table v9 迁移；真正引入复杂表格交互时再评估。
+- 应用没有 ThemeProvider，通知本来就回退到 system 主题；改用 Sonner 自带的 `theme="system"`，仍允许 Toaster props 覆盖，移除 `next-themes`。
+- 删除没有消费者的 `activeSection`，以及请求转换完全忽略的 resize 草稿 `mode`、`percent`、`factor`；当前 UI 仍提交精确宽高。后端 ResizeMode 的所有已实现模式和相应测试保持不变。
+- 保留 `isDirty` 和草稿变更入口：产品文档已明确规划修改后取消提示，维护成本很低；本轮不新增提示或改变关闭行为。metadata/report 草稿也保留。
+- 保留能力描述、IPC v1 命令/事件与调度契约、Clock、Engine、Executor、IpcTransport 等扩展或测试替换边界，不以暂时调用少为由缩减协议。
+- 保留标准 Radix/shadcn UI 原语，包括尚未使用的便捷导出。这些是可复用的基础组件而非业务框架；没有新增依赖，当前 production 构建会移除未使用导出，不值得为减少源码行数裁剪可访问性和组合接口。
+
+### 本轮验证
+
+| 验证 | 结果 |
+| --- | --- |
+| pnpm install --frozen-lockfile --ignore-scripts --offline | 通过；锁文件仅删除上述三个包，没有额外升级 |
+| pnpm test | 8 文件、57 项通过，含新增任务表 13 项回归测试 |
+| pnpm build | TypeScript 检查与 production 构建通过 |
+| pnpm contracts:check | 通过，未修改生成合约 |
+| cargo test --locked --manifest-path src-tauri/Cargo.toml --lib | 71 项通过，含 Rust/TS 合约一致性检查 |
+| 重构前后 DOM 对照 | 三种语言键、空状态、同步/错误状态、全部任务状态、进度边界及 Toaster 默认/覆盖主题共 23 组静态渲染输出完全一致 |
+| production CSS 对照 | 逐字节一致，SHA-256 为 `b8724030091af540fe67618d155f4a9277cb8f62d0889480815e4129b489ecd6` |
+| git diff --check | 通过 |
+
+相同工具链下，production JS 从 622.58 kB 降至 571.84 kB，gzip 从 193.24 kB 降至 178.69 kB；这是包体实测，不代表图像转换性能提升。表头固定、列宽、滚动容器、tooltip、进度/错误文案保持不变。独立 DOM 对照脚本和基线保存在本聊天的本地验证目录，不加入源码仓库。
+
+本轮没有重新执行原生 WebView 截图、交互烟测或安装包构建，DOM/CSS 对照不替代这些检查。既有 Vite 大 chunk 提示与 ts-rs `serde(transparent)` 提示仍在；未通过调整工具链或隐藏提示绕过验证。

@@ -1,0 +1,121 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+
+import { TooltipProvider } from "@/components/ui/tooltip";
+import type { BackendSyncStatus, JobSnapshot, JobStatus } from "@/lib/ipc";
+
+import TaskTable from "./TaskTable";
+
+const mocks = vi.hoisted(() => ({ useBackendRuntimeState: vi.fn() }));
+
+vi.mock("@/features/backend", () => mocks);
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => `translated:${key}` }),
+}));
+
+function job(status: JobStatus, totalItems = 1, completedItems = 0): JobSnapshot {
+  return {
+    id: `job-${status}`,
+    revision: 1,
+    configVersion: 1,
+    encoder: "mozjpeg",
+    status,
+    createdAt: 1_000,
+    updatedAt: 1_000,
+    counts: {
+      total: totalItems, queued: 0, running: 0, cancelling: 0,
+      succeeded: completedItems, failed: 0, cancelled: 0, skipped: 0,
+    },
+    progress: { completedItems, totalItems, activeItems: 0 },
+    controls: {
+      canPause: false, canResume: false, canCancel: false,
+      canRetry: false, canRemove: false,
+    },
+    result: null,
+    error: null,
+  };
+}
+
+function renderTable(
+  jobs: JobSnapshot[] | null = [],
+  syncStatus: BackendSyncStatus = "ready",
+  lastError: string | null = null,
+) {
+  mocks.useBackendRuntimeState.mockReturnValue({
+    snapshot: jobs === null ? null : { jobs }, syncStatus, lastError,
+  });
+  return renderToStaticMarkup(
+    <TooltipProvider>
+      <TaskTable />
+    </TooltipProvider>,
+  );
+}
+
+describe("TaskTable", () => {
+  it("keeps the fixed four-column layout and scrollable sticky header", () => {
+    const markup = renderTable([job("queued")]);
+    const headers = markup.match(/<th\b[^>]*>/g) ?? [];
+    const cells = markup.match(/<td\b[^>]*>/g) ?? [];
+
+    expect(headers).toHaveLength(4);
+    expect(cells).toHaveLength(4);
+    for (const columns of [headers, cells]) {
+      expect(columns[0]).toContain("w-8 px-1");
+      expect(columns[0]).toContain("width:32px;min-width:32px;max-width:32px");
+      expect(columns[1]).toContain("min-width:160px");
+      expect(columns[2]).toContain("min-width:130px");
+      expect(columns[3]).toContain("min-width:140px");
+    }
+    expect(markup).toContain("min-width:462px");
+    expect(markup).toContain("h-full overflow-auto");
+    expect(markup).toContain("sticky top-0 z-10 bg-background drop-shadow");
+    expect(markup).toContain("translated:file");
+    expect(markup).toContain("translated:options");
+    expect(markup).toContain("Progress");
+    expect(markup).toContain("mozjpeg · job-queued");
+    expect(markup).toContain("1 item</p>");
+  });
+
+  it.each([
+    ["ready", null, "No backend jobs."],
+    ["syncing", null, "Synchronizing backend jobs…"],
+    ["unavailable", "Backend unavailable", "Backend unavailable"],
+  ] as const)("renders the %s empty state", (syncStatus, lastError, message) => {
+    const markup = renderTable(null, syncStatus, lastError);
+    expect(markup).toContain('colSpan="4"');
+    expect(markup).toContain(message);
+  });
+
+  it.each([
+    ["queued", "bg-gray-400", "Queued"],
+    ["running", "bg-yellow-400", "Running"],
+    ["paused", "bg-blue-400", "Paused"],
+    ["cancelling", "bg-orange-400", "Cancelling"],
+    ["succeeded", "bg-green-400", "Succeeded"],
+    ["partially_succeeded", "bg-amber-500", "Partially Succeeded"],
+    ["failed", "bg-red-400", "Failed"],
+    ["cancelled", "bg-zinc-500", "Cancelled"],
+  ] as const)("renders the %s status", (status, lampClass, label) => {
+    const markup = renderTable([job(status)]);
+    expect(markup).toContain(`h-2 w-2 rounded-full ${lampClass}`);
+    expect(markup).toContain(`>${label}</p>`);
+  });
+
+  it("preserves zero, rounded and capped progress plus backend errors", () => {
+    const failed = job("failed");
+    failed.error = {
+      code: "output_failed", category: "output", messageKey: "outputFailed",
+      messageArgs: {}, fallbackMessage: "Cannot write output", retryable: false,
+      fieldErrors: [], diagnosticId: null,
+      context: { jobId: failed.id, itemId: null, stage: null, path: null },
+    };
+    const markup = renderTable([
+      job("queued", 0), job("running", 3, 1), job("succeeded", 1, 2), failed,
+    ]);
+    expect(markup).toContain(">—</p>");
+    expect(markup).toContain("33% · 1/3");
+    expect(markup).toContain("100% · 2/1");
+    expect(markup).toContain("3 items</p>");
+    expect(markup).toContain("Cannot write output");
+  });
+});

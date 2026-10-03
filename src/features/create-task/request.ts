@@ -96,8 +96,6 @@ function buildOperations(resize: ResizeDraftValue): Operation[] {
     return [];
   }
 
-  // Only exact dimensions are exposed by the current form. Keeping the
-  // conversion explicit prevents unused draft fields from leaking over IPC.
   const mode: ResizeMode = {
     kind: "exact",
     value: {
