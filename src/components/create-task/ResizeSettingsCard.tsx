@@ -35,6 +35,7 @@ export function ResizeSettingsCard() {
         <p className="text-sm font-bold">{t("resize")}</p>
         <Switch
           size="sm"
+          aria-label={t("resize")}
           checked={resize.enabled}
           onCheckedChange={(checked) =>
             updateCreateTaskDraft((draft) => {

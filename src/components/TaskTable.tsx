@@ -1,5 +1,8 @@
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import JobErrorsDialog from "@/components/JobErrorsDialog";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -47,6 +50,17 @@ export default function TaskTable() {
   const { t } = useTranslation();
   const backend = useBackendRuntimeState();
   const jobs = backend.snapshot?.jobs ?? [];
+  const [errorJobId, setErrorJobId] = useState<string | null>(null);
+  const errorJob = jobs.find((job) => job.id === errorJobId);
+  const errorTrigger = useRef<HTMLButtonElement | null>(null);
+  const tableContainer = useRef<HTMLDivElement | null>(null);
+  const closeErrors = useCallback(() => setErrorJobId(null), []);
+  const returnErrorFocus = useCallback(() => {
+    const target = errorTrigger.current?.isConnected
+      ? errorTrigger.current
+      : tableContainer.current;
+    target?.focus();
+  }, []);
   const emptyMessage =
     backend.syncStatus === "ready"
       ? t("noJobs")
@@ -55,9 +69,15 @@ export default function TaskTable() {
         : t("synchronizingJobs");
 
   return (
-    <div className="min-h-0 w-full flex-1 overflow-hidden rounded-lg border bg-background">
+    <div
+      ref={tableContainer}
+      tabIndex={-1}
+      role="region"
+      aria-label={t("tasks")}
+      className="min-h-0 w-full flex-1 overflow-hidden rounded-lg border bg-background"
+    >
       <Table
-        className="select-none"
+        className="table-fixed select-none"
         containerClassName="h-full overflow-auto"
         style={{ minWidth: 462 }}
       >
@@ -108,16 +128,30 @@ export default function TaskTable() {
                 </TableCell>
                 <TableCell style={{ minWidth: 140 }}>
                   <div className="min-w-0">
-                    <p className="text-sm">{t("jobStatus." + job.status)}</p>
+                    {!(job.status === "failed" && (job.counts.failed > 0 || job.error !== null)) && (
+                      <p className="text-sm">{t("jobStatus." + job.status)}</p>
+                    )}
                     {job.counts.waitingForMemory > 0 && (
                       <p className="text-xs text-muted-foreground">
                         {t("waitingForMemory", { count: job.counts.waitingForMemory })}
                       </p>
                     )}
-                    {job.error && (
-                      <p className="text-xs text-red-500 truncate">
-                        {formatBackendError(job.error, t)}
-                      </p>
+                    {(job.counts.failed > 0 || job.error !== null) && (
+                      <Button
+                        variant="link"
+                        size="xs"
+                        className={`h-auto max-w-full justify-start whitespace-normal p-0 text-destructive underline decoration-destructive/40 underline-offset-4 hover:decoration-destructive ${job.status === "failed" ? "text-sm" : "mt-1 text-xs"}`}
+                        aria-label={t("viewJobErrorsFor", { jobId: job.id })}
+                        title={t("viewJobErrors")}
+                        onClick={(event) => {
+                          errorTrigger.current = event.currentTarget;
+                          setErrorJobId(job.id);
+                        }}
+                      >
+                        {job.counts.failed > 0
+                          ? t("jobFailedItems", { count: job.counts.failed })
+                          : t("jobStatus.failed")}
+                      </Button>
                     )}
                   </div>
                 </TableCell>
@@ -132,6 +166,14 @@ export default function TaskTable() {
           )}
         </TableBody>
       </Table>
+      {errorJob && (
+        <JobErrorsDialog
+          key={errorJob.id}
+          jobId={errorJob.id}
+          onClose={closeErrors}
+          onReturnFocus={returnErrorFocus}
+        />
+      )}
     </div>
   );
 }

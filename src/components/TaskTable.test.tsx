@@ -106,7 +106,7 @@ describe("TaskTable", () => {
     expect(markup).toContain(`>${label}</p>`);
   });
 
-  it("preserves zero, rounded and capped progress plus backend errors", () => {
+  it("preserves progress and moves backend errors behind a details button", () => {
     const failed = job("failed");
     failed.error = {
       code: "output_failed", category: "output", messageKey: "outputFailed",
@@ -121,7 +121,9 @@ describe("TaskTable", () => {
     expect(markup).toContain("33% · 1/3");
     expect(markup).toContain("100% · 2/1");
     expect(markup).toContain("3 items</p>");
-    expect(markup).toContain("Cannot write output");
+    expect(markup).toContain(i18n.t("viewJobErrorsFor", { jobId: failed.id }));
+    expect(markup).toContain(`>${i18n.t("jobStatus.failed")}</button>`);
+    expect(markup).not.toContain("Cannot write output");
   });
 
   it.each([
@@ -151,17 +153,23 @@ describe("TaskTable", () => {
     expect(renderTable([job("queued")])).not.toContain(i18n.t("waitingForMemory", { count: 0 }));
   });
 
-  it.each(["en", "zh", "ja"])("localizes structured job errors in %s", async (language) => {
+  it.each(["en", "zh", "ja"])("offers localized error details from failed item counts in %s", async (language) => {
     await i18n.changeLanguage(language);
-    const failed = job("failed");
-    failed.error = {
-      code: "decode_failed", category: "input", messageKey: "errors.decodeFailed",
-      messageArgs: {}, fallbackMessage: "Original backend diagnostic", retryable: false,
-      fieldErrors: [], diagnosticId: null,
-      context: { jobId: failed.id, itemId: null, stage: null, path: null },
-    };
+    const failed = job("partially_succeeded", 3, 3);
+    failed.counts.failed = 2;
     const markup = renderTable([failed]);
-    expect(markup).toContain(i18n.t("errors.decodeFailed"));
-    expect(markup).not.toContain("Original backend diagnostic");
+    expect(markup).toContain(`>${i18n.t("jobFailedItems", { count: 2 })}</button>`);
+    expect(markup).not.toContain(`>${i18n.t("viewJobErrors")}</button>`);
+    expect(markup).toContain(i18n.t("viewJobErrorsFor", { jobId: failed.id }));
+    expect(markup.match(/<td\b[^>]*>/g)).toHaveLength(4);
+    expect(renderTable([job("succeeded")])).not.toContain(i18n.t("viewJobErrors"));
+  });
+
+  it("allows inspecting failures while the rest of a job is still running", () => {
+    const running = job("running", 3, 1);
+    running.counts.failed = 1;
+    const markup = renderTable([running]);
+    expect(markup).toContain(i18n.t("viewJobErrorsFor", { jobId: running.id }));
+    expect(markup).not.toContain('disabled=""');
   });
 });

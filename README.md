@@ -32,7 +32,7 @@ Image processing runs locally inside the Rust application using [rimage](https:/
 
 ### Input
 
-Version **0.1.1** accepts **JPEG, PNG, WebP, JPEG XL, BMP/DIB, Radiance HDR, PSD, QOI, Farbfeld, PNM/PPM, AVIF, TIFF, SVG and SVGZ** files. Decoding is subject to the capabilities and limits of the underlying codecs; accepting a file extension does not guarantee that every variant of that format can be decoded.
+Version **0.2.0** accepts **JPEG, PNG, WebP, JPEG XL, BMP/DIB, Radiance HDR, PSD, QOI, Farbfeld, PNM/PPM, AVIF, TIFF, SVG and SVGZ** files. Decoding is subject to the capabilities and limits of the underlying codecs; accepting a file extension does not guarantee that every variant of that format can be decoded.
 
 ### Output
 

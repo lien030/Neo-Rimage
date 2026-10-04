@@ -37,7 +37,7 @@ Windows 构建使用固定的 dav1d 1.5.4 静态库与动态 CRT；用户无需�
 
 ### 输入
 
-**0.1.1** 接受 **JPEG、PNG、WebP、JPEG XL、BMP/DIB、Radiance HDR、PSD、QOI、Farbfeld、PNM/PPM、AVIF、TIFF、SVG 和 SVGZ** 文件。实际解码能力受底层编解码器支持范围与限制影响；扩展名被接受，并不代表该格式的所有变体都能成功解码。
+**0.2.0** 接受 **JPEG、PNG、WebP、JPEG XL、BMP/DIB、Radiance HDR、PSD、QOI、Farbfeld、PNM/PPM、AVIF、TIFF、SVG 和 SVGZ** 文件。实际解码能力受底层编解码器支持范围与限制影响；扩展名被接受，并不代表该格式的所有变体都能成功解码。
 
 ### 输出
 

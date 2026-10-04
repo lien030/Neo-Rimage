@@ -1,4 +1,4 @@
-neo-rimage 0.1.1 — Third-party notices
+neo-rimage 0.2.0 — Third-party notices
 
 Original neo-rimage source: MIT. The combined application containing imagequant is distributed under GPL-3.0-or-later. Each third-party component retains its original license. See DISTRIBUTION.md, GPL-3.0.txt, PROJECT-MIT.txt and SOURCES.md.
 

@@ -887,22 +887,164 @@ mod tests {
             assert_eq!(result.output.format, expected_format, "{name}");
             let bytes = fs::read(&result.output_path).expect("read encoded output");
             assert_format_signature(name, &bytes);
-            // zune-farbfeld 0.5.2 rejects even a valid 8x8 output with
-            // `Too small output buffer size`; validate its complete raw layout
-            // below instead of turning that upstream decoder bug into a false
-            // encoder failure.
-            if name != "farbfeld.ff" {
-                let mut decode_request = request.clone();
-                decode_request.input_path = result.output_path.clone();
-                decode_request.output.output_path = directory.path(&format!("redecoded-{name}"));
-                decode_request.operations.clear();
-                let plan = LocalEngine::new()
-                    .prepare(&decode_request, 64 * 1024 * 1024)
+            let mut decode_request = request.clone();
+            decode_request.input_path = result.output_path.clone();
+            decode_request.output.output_path = directory.path(&format!("redecoded-{name}"));
+            decode_request.operations.clear();
+            let plan = LocalEngine::new()
+                .prepare(&decode_request, 64 * 1024 * 1024)
+                .unwrap();
+            let decoded = super::super::input::decode(&decode_request, &plan)
+                .unwrap_or_else(|error| panic!("{name} could not be decoded again: {error:?}"));
+            assert_eq!(decoded.dimensions(), expected_dimensions, "{name}");
+        }
+    }
+
+    fn farbfeld_fixture(width: u32, height: u32, samples: &[u16]) -> Vec<u8> {
+        let mut bytes = b"farbfeld".to_vec();
+        bytes.extend_from_slice(&width.to_be_bytes());
+        bytes.extend_from_slice(&height.to_be_bytes());
+        bytes.extend(samples.iter().flat_map(|sample| sample.to_be_bytes()));
+        bytes
+    }
+
+    #[test]
+    fn farbfeld_and_png_roundtrip_preserves_rgba16_samples() {
+        use zune_core::{bit_depth::BitDepth, bytestream::ZCursor, colorspace::ColorSpace};
+        use zune_image::{codecs::farbfeld::FarbFeldDecoder, traits::DecoderTrait};
+
+        let samples = [0x0102, 0xabcd, 0x8001, 0, 0xffff, 1, 0x1234, 0x8001];
+        let fixture = farbfeld_fixture(2, 1, &samples);
+        // Exercise the zune-image adapter as well as the application's fresh decoder.
+        let mut decoder = FarbFeldDecoder::new(ZCursor::new(&fixture));
+        DecoderTrait::read_headers(&mut decoder).unwrap();
+        let decoded = DecoderTrait::decode(&mut decoder).unwrap();
+        assert_eq!(decoded.flatten_frames::<u16>()[0], samples);
+
+        for extension in ["ff", "farbfeld"] {
+            let directory = TestDirectory::new();
+            let mut request = request(&directory);
+            request.input_path = directory.path(&format!("input.{extension}"));
+            fs::write(&request.input_path, &fixture).unwrap();
+            request.operations.clear();
+
+            for (name, encoder) in [
+                ("first.png", EncoderConfig::Png),
+                ("roundtrip.ff", EncoderConfig::Farbfeld),
+                ("roundtrip.png", EncoderConfig::Png),
+            ] {
+                request.encoder = encoder;
+                request.output.output_path = directory.path(name);
+                let result = LocalEngine::new()
+                    .process(&request, &NoopProgressReporter, &NeverCancelled)
                     .unwrap();
-                let decoded = super::super::input::decode(&decode_request, &plan)
-                    .unwrap_or_else(|error| panic!("{name} could not be decoded again: {error:?}"));
-                assert_eq!(decoded.dimensions(), expected_dimensions, "{name}");
+                assert_eq!((result.output.width, result.output.height), (2, 1));
+                assert_eq!(result.output.bit_depth, Some(16));
+                assert_eq!(result.output.has_alpha, Some(true));
+                if name == "roundtrip.ff" {
+                    assert_eq!(fs::read(&result.output_path).unwrap(), fixture);
+                }
+                request.input_path = result.output_path;
+                request.output.output_path = directory.path(&format!("inspect-{name}"));
+                let plan = LocalEngine::new()
+                    .prepare(&request, 64 * 1024 * 1024)
+                    .unwrap();
+                let decoded = super::super::input::decode(&request, &plan).unwrap();
+                assert_eq!(decoded.depth(), BitDepth::Sixteen);
+                assert_eq!(decoded.colorspace(), ColorSpace::RGBA);
+                assert_eq!(decoded.flatten_frames::<u16>()[0], samples);
             }
+        }
+    }
+
+    #[test]
+    fn farbfeld_invalid_and_changed_inputs_create_no_output() {
+        let directory = TestDirectory::new();
+        let mut request = request(&directory);
+        request.input_path = directory.path("input.ff");
+        request.output.output_path = directory.path("output.png");
+        request.encoder = EncoderConfig::Png;
+        request.operations.clear();
+        let valid = farbfeld_fixture(1, 1, &[0x0102, 0xabcd, 0x8001, 0xffff]);
+
+        for bytes in [
+            farbfeld_fixture(0, 1, &[]),
+            valid[..valid.len() - 1].to_vec(),
+        ] {
+            fs::write(&request.input_path, bytes).unwrap();
+            let error = LocalEngine::new()
+                .process(&request, &NoopProgressReporter, &NeverCancelled)
+                .unwrap_err();
+            assert_eq!(error.code.0, "input.decode_failed");
+            assert!(!request.output.output_path.exists());
+        }
+
+        fs::write(&request.input_path, &valid).unwrap();
+        assert!(matches!(
+            LocalEngine::new().prepare(&request, 0),
+            Err(super::super::PrepareError::NeedsBudget(_))
+        ));
+        let plan = LocalEngine::new()
+            .prepare(&request, 64 * 1024 * 1024)
+            .unwrap();
+        let mut changed = valid;
+        changed[16] ^= 1;
+        fs::write(&request.input_path, changed).unwrap();
+        let error = LocalEngine::new()
+            .execute_prepared(
+                &request,
+                &plan,
+                &EngineContext::new(&NoopProgressReporter, &NeverCancelled),
+            )
+            .unwrap_err();
+        assert_eq!(error.code.0, "input.changed");
+        assert!(!request.output.output_path.exists());
+    }
+
+    #[test]
+    fn webp_lossless_effort_preserves_transparent_rgb_and_alpha() {
+        use zune_core::colorspace::ColorSpace;
+        use zune_image::{codecs::png::PngEncoder, image::Image, traits::EncoderTrait};
+
+        let pixels: Vec<u8> = (0..128)
+            .flat_map(|index| {
+                [
+                    (index * 17) as u8,
+                    (index * 11 + 3) as u8,
+                    (index * 7 + 5) as u8,
+                    [0, 128, 255][index % 3],
+                ]
+            })
+            .collect();
+        let image = Image::from_u8(&pixels, 16, 8, ColorSpace::RGBA);
+        let mut png = Vec::new();
+        PngEncoder::new().encode(&image, &mut png).unwrap();
+        let directory = TestDirectory::new();
+        let mut request = request(&directory);
+        request.input_path = directory.path("transparent.png");
+        fs::write(&request.input_path, png).unwrap();
+        request.operations.clear();
+
+        for quality in [1.0, 75.0, 100.0] {
+            request.encoder = EncoderConfig::WebP(WebPConfig {
+                lossless: true,
+                quality,
+                slight_loss: 0,
+                exact: true,
+            });
+            request.output.output_path = directory.path(&format!("effort-{quality}.webp"));
+            let result = LocalEngine::new()
+                .process(&request, &NoopProgressReporter, &NeverCancelled)
+                .unwrap();
+            let mut decode_request = request.clone();
+            decode_request.input_path = result.output_path;
+            decode_request.output.output_path = directory.path(&format!("inspect-{quality}.webp"));
+            let plan = LocalEngine::new()
+                .prepare(&decode_request, 64 * 1024 * 1024)
+                .unwrap();
+            let decoded = super::super::input::decode(&decode_request, &plan).unwrap();
+            assert_eq!(decoded.dimensions(), (16, 8));
+            assert_eq!(decoded.flatten_to_u8()[0], pixels, "effort {quality}");
         }
     }
 

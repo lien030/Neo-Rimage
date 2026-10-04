@@ -9,7 +9,7 @@ import App from "./App";
 vi.mock("@/features/backend", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/features/backend")>(),
   useBackendRuntimeSync: vi.fn(),
-  useBackendCommandState: () => ({ schedulerPending: false, workerCountPending: false }),
+  useBackendCommandState: () => ({ schedulerPending: false, workerCountPending: false, cleanupPending: false }),
   useBackendRuntimeState: () => ({
     capabilities: null,
     syncStatus: "ready",

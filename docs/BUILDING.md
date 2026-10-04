@@ -2,7 +2,7 @@
 
 ## English
 
-Release **0.1.1** targets Windows x64 (`x86_64-pc-windows-msvc`). Use the source revision matching the binary, including vendored rimage and both lockfiles. This version does not upgrade the compiler, framework or installer toolchain.
+Release **0.2.0** targets Windows x64 (`x86_64-pc-windows-msvc`). Use the source revision matching the binary, including vendored rimage and zune-farbfeld and both lockfiles. This version does not upgrade the compiler, framework or installer toolchain.
 
 Validated tools: Node.js **24.19.0**, pnpm **10.30.3**, Rust/Cargo **1.96.1**, MSVC C++ Build Tools with Windows SDK, NASM, and Windows VBScript for MSI generation. See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/). Installer tools remain NSIS **3.11**, WiX **3.14.1**, nsis-tauri-utils **0.5.3**; sources/notices are in `licenses/INSTALLER-NOTICES.txt`. WebView2 is required at runtime, but no separate rimage, dav1d or vcpkg installation is needed.
 
@@ -28,7 +28,7 @@ pnpm tauri build --bundles nsis,msi --ci -- --locked
 ./tools/package-windows.ps1
 ```
 
-The build hook runs `pnpm build`. Packaging writes the NSIS installer, MSI, portable ZIP and SHA256SUMS to `src-tauri/target/distribution/0.1.1/`. The ZIP includes the EXE and the same license materials as installers; copying only the EXE omits them. Artifacts are unsigned. These scripts do not push, tag or publish a Release.
+The build hook runs `pnpm build`. Packaging writes the NSIS installer, MSI, portable ZIP and SHA256SUMS to `src-tauri/target/distribution/0.2.0/`. The ZIP includes the EXE and the same license materials as installers; copying only the EXE omits them. Artifacts are unsigned. These scripts do not push, tag or publish a Release.
 
 ### Source and licensing
 
@@ -40,11 +40,11 @@ Original project source remains MIT. Combined binaries including imagequant are 
 
 ### Validation boundary
 
-See [v0.1.1-validation.md](v0.1.1-validation.md) for tests and measured parallel throughput. PE import inspection and running without native build environment variables check the static link on the development host. They are **not** substitutes for startup, conversion and install/uninstall tests on clean Windows without dav1d/vcpkg. Such a VM was unavailable during implementation; verify it before publication. macOS/Linux builds are not validated.
+See [v0.2.0-validation.md](v0.2.0-validation.md) for current regressions and [v0.1.1-validation.md](v0.1.1-validation.md) for the earlier parallel throughput measurements. PE import inspection and running without native build environment variables check the static link on the development host. They are **not** substitutes for startup, conversion and install/uninstall tests on clean Windows without dav1d/vcpkg. Such a VM was unavailable during implementation. macOS/Linux builds are not validated.
 
 ## 简体中文
 
-**0.1.1** 面向 Windows x64。使用与二进制对应的源码提交、内置 rimage 和两个锁文件；本版本不升级编译器、框架或安装器工具链。工具版本及系统前提见上方；运行需要 WebView2，不需要独立 rimage、dav1d 或 vcpkg。
+**0.2.0** 面向 Windows x64。使用与二进制对应的源码提交、内置 rimage、zune-farbfeld 和两个锁文件；本版本不升级编译器、框架或安装器工具链。工具版本及系统前提见上方；运行需要 WebView2，不需要独立 rimage、dav1d 或 vcpkg。
 
 ### 原生依赖与构建
 
@@ -52,7 +52,7 @@ See [v0.1.1-validation.md](v0.1.1-validation.md) for tests and measured parallel
 
 保留 rimage 显式 feature 白名单，增加 AVIF/TIFF/SVG/limits，不启用 CLI 或整体线程特性；ravif 默认 feature 关闭，dav1d 内部解码线程固定为 1。这不表示所有第三方编码器都没有内部线程。
 
-安装器、MSI、包含许可资料的便携 ZIP 与 SHA256SUMS 输出到 `src-tauri/target/distribution/0.1.1/`。安装包未签名。脚本不会 push、打 tag 或发布 GitHub Release。
+安装器、MSI、包含许可资料的便携 ZIP 与 SHA256SUMS 输出到 `src-tauri/target/distribution/0.2.0/`。安装包未签名。脚本不会 push、打 tag 或发布 GitHub Release。
 
 ### 源码、许可与验证
 
@@ -60,4 +60,4 @@ See [v0.1.1-validation.md](v0.1.1-validation.md) for tests and measured parallel
 
 原创源码保持 MIT；包含 imagequant 的组合二进制按 GPL-3.0-or-later 分发，详见 [DISTRIBUTION.md](DISTRIBUTION.md)。便携包必须附带与安装器相同的许可资料，不能只复制 EXE。
 
-测试及混合批处理实测见 [v0.1.1-validation.md](v0.1.1-validation.md)。开发机 PE 导入检查、移除原生构建环境后的启动，不能替代干净 Windows 启动、转换、安装/卸载验证；本次无可用干净虚拟机，请在发布前补验。macOS/Linux 未验证。
+当前回归见 [v0.2.0-validation.md](v0.2.0-validation.md)，此前混合批处理实测见 [v0.1.1-validation.md](v0.1.1-validation.md)。开发机 PE 导入检查、移除原生构建环境后的启动，不能替代干净 Windows 启动、转换、安装/卸载验证；本次无可用干净虚拟机。macOS/Linux 未验证。

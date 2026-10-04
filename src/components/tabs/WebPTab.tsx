@@ -33,11 +33,11 @@ export default function WebPTab({
         }
       />
       <TabCard
-        title={t("quality")}
+        title={t(config.lossless ? "webpCompressionEffort" : "quality")}
+        description={config.lossless ? t("webpCompressionEffortDescription") : undefined}
         value={config.quality}
         min={1}
         max={100}
-        disabled={config.lossless}
         onValueChange={(value) =>
           updateCreateTaskDraft((draft) => {
             draft.webp.quality = value;

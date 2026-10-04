@@ -30,6 +30,7 @@ interface BackendRuntimeState {
 interface BackendCommandState {
   schedulerPending: boolean;
   workerCountPending: boolean;
+  cleanupPending: boolean;
 }
 
 export const backendRuntimeState = proxy<BackendRuntimeState>({
@@ -44,6 +45,7 @@ export const backendRuntimeState = proxy<BackendRuntimeState>({
 export const backendCommandState = proxy<BackendCommandState>({
   schedulerPending: false,
   workerCountPending: false,
+  cleanupPending: false,
 });
 
 export function useBackendRuntimeState() {

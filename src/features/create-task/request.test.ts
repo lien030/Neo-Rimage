@@ -47,6 +47,25 @@ function expectValidationCode(
 }
 
 describe("buildCreateJobRequest", () => {
+  it.each([false, true])("validates and preserves WebP quality with lossless=%s", (lossless) => {
+    const draft = draftWith({ activeEncoder: "webp" });
+    draft.webp.lossless = lossless;
+    for (const quality of ["", "101", "-1", "NaN"]) {
+      draft.webp.quality = quality;
+      expectValidationCode(
+        () => buildCreateJobRequest(draft, SAMPLE_INPUTS, ALL_ENCODERS),
+        "webp_quality_invalid",
+      );
+    }
+    for (const quality of [1, 75, 100]) {
+      draft.webp.quality = String(quality);
+      expect(buildCreateJobRequest(draft, SAMPLE_INPUTS, ALL_ENCODERS).encoder).toEqual({
+        kind: "webp",
+        options: { lossless, quality, slightLoss: 0, exact: false },
+      });
+    }
+  });
+
   it("requires at least one input", () => {
     expectValidationCode(
       () => buildCreateJobRequest(draftWith(), [], ALL_ENCODERS),

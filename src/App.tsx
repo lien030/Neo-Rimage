@@ -1,6 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
 import {
-  CookingPot,
   Download,
   Minus,
   Pickaxe,
@@ -14,15 +13,10 @@ import { toast } from "sonner";
 
 import CreateTaskDialog from "./CreateTaskDialog";
 import TaskTable from "./components/TaskTable";
+import TaskCleanupMenu from "./components/TaskCleanupMenu";
 import TitleBar from "./components/TitleBar";
 import WorkerList from "./components/WorkerList";
 import { Button } from "./components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "./components/ui/dropdown-menu";
 import {
   formatBackendError,
   setSchedulerPaused,
@@ -180,7 +174,7 @@ function App() {
                 >
                   <Plus size={16} className="text-white" />
                 </Button>
-                <JobStatusMenu disabled={!backendReady} />
+                <TaskCleanupMenu />
               </span>
             </div>
             <TaskTable />
@@ -273,42 +267,6 @@ function App() {
       </main>
       <TitleBar />
     </div>
-  );
-}
-
-function JobStatusMenu({ disabled }: { disabled: boolean }) {
-  const { t } = useTranslation();
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          size="icon"
-          disabled={disabled}
-          aria-label={t("jobStatusMenu")}
-          title={t("jobStatusMenu")}
-          className="h-7 w-12 rounded-lg border bg-background text-muted-foreground hover:bg-muted-foreground/10"
-        >
-          <CookingPot size={16} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuItem>
-          <figure className="flex items-center justify-center">
-            <div className="h-2 w-2 rounded-full bg-green-400" />
-          </figure>
-          <p className="mx-2">{t("success")}</p>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <figure className="flex items-center justify-center">
-            <div className="h-2 w-2 rounded-full bg-red-400" />
-          </figure>
-          <p className="mx-2">{t("error")}</p>
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled>
-          <p className="mx-4">{t("clearAll")}</p>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 

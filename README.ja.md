@@ -37,7 +37,7 @@ Windows は dav1d 1.5.4 を静的リンクし、CRT は動的リンクします�
 
 ### 入力
 
-**0.1.1** では **JPEG、PNG、WebP、JPEG XL、BMP/DIB、Radiance HDR、PSD、QOI、Farbfeld、PNM/PPM、AVIF、TIFF、SVG、SVGZ** を入力できます。実際のデコード可否は、使用するコーデックの対応範囲と制限に依存します。拡張子が受け付けられても、その形式のすべてのバリエーションをデコードできるとは限りません。
+**0.2.0** では **JPEG、PNG、WebP、JPEG XL、BMP/DIB、Radiance HDR、PSD、QOI、Farbfeld、PNM/PPM、AVIF、TIFF、SVG、SVGZ** を入力できます。実際のデコード可否は、使用するコーデックの対応範囲と制限に依存します。拡張子が受け付けられても、その形式のすべてのバリエーションをデコードできるとは限りません。
 
 ### 出力
 

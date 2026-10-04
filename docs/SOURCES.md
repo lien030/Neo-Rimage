@@ -1,8 +1,8 @@
 # Corresponding source / 对应源码
 
-Version / 版本: **0.1.1**. Target / 目标平台: **x86_64-pc-windows-msvc**.
+Version / 版本: **0.2.0**. Target / 目标平台: **x86_64-pc-windows-msvc**.
 
-Project source and local modifications / 项目源码及本地修改: [v0.1.1](https://github.com/lien030/Neo-Rimage/tree/v0.1.1); [GitHub source archive / GitHub 源码归档](https://github.com/lien030/Neo-Rimage/archive/refs/tags/v0.1.1.zip).
+Project source and local modifications / 项目源码及本地修改: [v0.2.0](https://github.com/lien030/Neo-Rimage/tree/v0.2.0); [GitHub source archive / GitHub 源码归档](https://github.com/lien030/Neo-Rimage/archive/refs/tags/v0.2.0.zip).
 
 Build instructions / 构建说明: [BUILDING.md](BUILDING.md). Distribution terms / 发行许可: [DISTRIBUTION.md](DISTRIBUTION.md).
 
@@ -243,7 +243,7 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | resvg@0.48.1 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/resvg/resvg-0.48.1.crate) | 67e3803f97b999e80cbf7c6ecdd07a8102204d92e1633cf48783720c521196bd |
 | Rust | rfd@0.16.0 | MIT | [Source / 源码](https://static.crates.io/crates/rfd/rfd-0.16.0.crate) | a15ad77d9e70a92437d8f74c35d99b4e4691128df018833e99f90bcd36152672 |
 | Rust | rgb@0.8.53 | MIT | [Source / 源码](https://static.crates.io/crates/rgb/rgb-0.8.53.crate) | 47b34b781b31e5d73e9fbc8689c70551fd1ade9a19e3e28cfec8580a79290cc4 |
-| Rust | rimage@0.14.0 | MIT OR Apache-2.0 | [Source / 源码](https://github.com/lien030/Neo-Rimage/tree/v0.1.1/src-tauri/vendor/rimage) | Included in project source / 包含于项目源码 |
+| Rust | rimage@0.14.0 | MIT OR Apache-2.0 | [Source / 源码](https://github.com/lien030/Neo-Rimage/tree/v0.2.0/src-tauri/vendor/rimage) | Included in project source / 包含于项目源码 |
 | Rust | roxmltree@0.21.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/roxmltree/roxmltree-0.21.1.crate) | f1964b10c76125c36f8afe190065a4bf9a87bf324842c05701330bba9f1cacbb |
 | Rust | rustc_version@0.4.1 | MIT OR Apache-2.0 | [Source / 源码](https://static.crates.io/crates/rustc_version/rustc_version-0.4.1.crate) | cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92 |
 | Rust | rustc-hash@2.1.3 | Apache-2.0 OR MIT | [Source / 源码](https://static.crates.io/crates/rustc-hash/rustc-hash-2.1.3.crate) | 6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d |
@@ -390,7 +390,7 @@ These sources are hosted by their upstream providers. The distributor remains re
 | Rust | zopfli@0.8.3 | Apache-2.0 | [Source / 源码](https://static.crates.io/crates/zopfli/zopfli-0.8.3.crate) | f05cd8797d63865425ff89b5c4a48804f35ba0ce8d125800027ad6017d2b5249 |
 | Rust | zune-bmp@0.5.2 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://static.crates.io/crates/zune-bmp/zune-bmp-0.5.2.crate) | 1b77b890dbf6b1a32fc57d9f1f30e22175694c454581de7c6e466f2853cf9fe3 |
 | Rust | zune-core@0.5.1 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://static.crates.io/crates/zune-core/zune-core-0.5.1.crate) | cb8a0807f7c01457d0379ba880ba6322660448ddebc890ce29bb64da71fb40f9 |
-| Rust | zune-farbfeld@0.5.2 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://static.crates.io/crates/zune-farbfeld/zune-farbfeld-0.5.2.crate) | 46689bf6c90702cba18ef876cc0d29affa8cda58e82a1246fced3a820e0e4c3d |
+| Rust | zune-farbfeld@0.5.2 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://github.com/lien030/Neo-Rimage/tree/v0.2.0/src-tauri/vendor/zune-farbfeld) | Included in project source / 包含于项目源码 |
 | Rust | zune-hdr@0.5.2 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://static.crates.io/crates/zune-hdr/zune-hdr-0.5.2.crate) | 34f7d50f1e3f3a95efa12c3c5048ad84e9d7fd8b1bc5faf01fd35b8df1f103e9 |
 | Rust | zune-image@0.5.0 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://static.crates.io/crates/zune-image/zune-image-0.5.0.crate) | d67f66717c2ca4f5fe18894e4724c7d22076dea8f245ea5386a05a4b6b8f4a53 |
 | Rust | zune-inflate@0.2.54 | MIT OR Apache-2.0 OR Zlib | [Source / 源码](https://static.crates.io/crates/zune-inflate/zune-inflate-0.2.54.crate) | 73ab332fe2f6680068f3582b16a24f90ad7096d5d39b974d1c0aff0125116f02 |

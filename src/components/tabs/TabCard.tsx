@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 
+import { InlineHelp } from "../create-task/DraftControls";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
 
 interface BaseTabCardProps {
   title: string;
+  description?: string;
   disabled?: boolean;
 }
 
@@ -40,9 +42,11 @@ export default function TabCard(props: TabCardProps) {
         <p className="min-w-0 truncate font-bold" title={props.title}>
           {props.title}
         </p>
+        {props.description && <InlineHelp label={props.title} description={props.description} />}
         {props.variant === "boolean" && (
           <Switch
             size="sm"
+            aria-label={props.title}
             checked={props.value}
             disabled={props.disabled}
             onCheckedChange={props.onValueChange}
@@ -52,6 +56,7 @@ export default function TabCard(props: TabCardProps) {
       {(props.variant === undefined || props.variant === "number") && (
         <Input
           type="number"
+          aria-label={props.title}
           value={props.value}
           placeholder={props.placeholder}
           min={props.min}

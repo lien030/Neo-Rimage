@@ -1,6 +1,6 @@
 [package]
 name = "neo-rimage"
-version = "0.1.1"
+version = "0.2.0"
 description = "Native image conversion and optimization desktop app powered by rimage"
 license = "MIT"
 edition = "2021"
@@ -54,3 +54,6 @@ tiff = { version = "0.11.3", default-features = false, features = ["lzw", "defla
 rav1e = { version = "0.8.1", default-features = false }
 avif-serialize = "0.8.9"
 fax = "0.2.7"
+
+[patch.crates-io]
+zune-farbfeld = { path = "vendor/zune-farbfeld" }

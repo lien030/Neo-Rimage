@@ -58,10 +58,10 @@ export function CompactSwitch({
   return (
     <div className="flex min-w-0 items-center justify-between gap-2 text-[0.7rem]">
       <span className="flex min-w-0 items-center gap-1">
-        <label htmlFor={switchId} className="truncate">
+        <label htmlFor={switchId} className="truncate" title={label}>
           {label}
         </label>
-        {description && <InlineHelp description={description} />}
+        <InlineHelp label={label} description={description} />
       </span>
       <Switch
         id={switchId}
@@ -75,14 +75,14 @@ export function CompactSwitch({
   );
 }
 
-export function InlineHelp({ description }: { description: string }) {
+export function InlineHelp({ label, description }: { label?: string; description?: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           type="button"
           className="shrink-0 text-muted-foreground/70 transition-colors hover:text-foreground focus-visible:text-foreground"
-          aria-label={description}
+          aria-label={[label, description].filter(Boolean).join(": ")}
         >
           <CircleHelp className="size-3" />
         </button>
@@ -92,7 +92,8 @@ export function InlineHelp({ description }: { description: string }) {
         sideOffset={6}
         className="max-w-64 leading-relaxed"
       >
-        <p>{description}</p>
+        {label && <p className="font-medium">{label}</p>}
+        {description && <p>{description}</p>}
       </TooltipContent>
     </Tooltip>
   );

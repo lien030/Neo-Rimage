@@ -2553,7 +2553,7 @@ dependencies = [
 
 [[package]]
 name = "neo-rimage"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "avif-serialize",
  "data-url",
@@ -5967,8 +5967,6 @@ dependencies = [
 [[package]]
 name = "zune-farbfeld"
 version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46689bf6c90702cba18ef876cc0d29affa8cda58e82a1246fced3a820e0e4c3d"
 dependencies = [
  "zune-core",
 ]

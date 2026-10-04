@@ -45,7 +45,7 @@ export function EncoderPanel({
       </div>
       <div
         className={cn(
-          "grid min-h-0 w-full flex-1 grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2 overflow-y-auto pr-1",
+          "grid min-h-0 w-full flex-1 grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-2 overflow-y-auto pr-1",
           fillContent
             ? "grid-rows-[minmax(0,1fr)] content-stretch"
             : "auto-rows-max content-start",
